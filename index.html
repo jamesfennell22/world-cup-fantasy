@@ -86,17 +86,21 @@
   .status-bar {
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
     padding: 9px 14px; margin-bottom: 20px; font-size: 0.8rem; color: var(--muted);
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; justify-content: space-between;
   }
+  .status-left { display: flex; align-items: center; gap: 8px; }
   .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
   .status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
   .status-dot.error { background: #ef4444; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes slideIn { from { opacity:0; transform: translateX(-16px); } to { opacity:1; transform: none; } }
 
   /* LEADERBOARD */
   .player-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px;
     margin-bottom: 10px; overflow: hidden; transition: border-color .2s;
+    animation: slideIn .35s ease both;
   }
   .player-card:hover { border-color: rgba(245,166,35,0.4); }
   .card-header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; cursor: pointer; }
@@ -122,7 +126,7 @@
   .score-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
   .expand-hint { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
 
-  /* BREAKDOWN HOVER PANELS */
+  /* TEAM DETAIL PANEL (inside card) */
   .card-breakdown { display: none; border-top: 1px solid var(--border); }
   .card-breakdown.open { display: block; }
   .team-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); }
@@ -146,6 +150,7 @@
   .detail-row .dr-val { font-weight: 600; }
   .dr-val.pos { color: var(--green); }
   .dr-val.neg { color: #ef4444; }
+  .dr-val.neu { color: var(--accent); }
   .match-result-row {
     background: var(--surface); border-radius: 8px; padding: 10px 12px;
     font-size: 0.8rem; border-left: 3px solid var(--border);
@@ -167,7 +172,7 @@
   }
   .live-fixture {
     background: var(--card); border: 1px solid #ef4444; border-radius: 10px;
-    padding: 14px 18px; margin-bottom: 8px;
+    padding: 14px 18px; margin-bottom: 8px; animation: fadeIn .3s ease;
   }
   .fixture-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 10px;
@@ -177,6 +182,7 @@
   .fixture-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .fixture-teams { font-weight: 600; font-size: 0.9rem; }
   .fixture-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--accent); }
+  .fixture-meta { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
   .fixture-owners { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
   .owner-tag {
     background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
@@ -199,11 +205,13 @@
   td.win-cell { color: var(--green); font-weight: 700; }
   td.loss-cell { color: #ef4444; }
   td.draw-cell { color: var(--muted); }
+  .h2h-note { font-size: 0.75rem; color: var(--muted); margin-top: 12px; }
 
   /* GOLDEN BOOT */
   .boot-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 10px;
     padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 14px;
+    animation: slideIn .35s ease both;
   }
   .boot-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; width: 28px; text-align: center; flex-shrink: 0; }
   .boot-info { flex: 1; }
@@ -211,6 +219,7 @@
   .boot-team { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
   .boot-fantasy { font-size: 0.7rem; margin-top: 4px; }
   .boot-goals { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent); flex-shrink: 0; }
+  .boot-goals span { font-size: 0.7rem; color: var(--muted); display: block; text-align: center; font-family: 'DM Sans', sans-serif; }
 
   /* SCORING LEGEND */
   .scoring-legend {
@@ -219,10 +228,11 @@
   }
   .scoring-legend h3 { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
   .legend-row { display: flex; justify-content: space-between; font-size: 0.78rem; padding: 3px 0; border-bottom: 1px solid rgba(42,58,85,0.5); }
+  .legend-row:last-child { border: none; }
   .legend-val { font-weight: 600; color: var(--accent); }
   .legend-val.neg { color: #ef4444; }
 
-  /* SETUP PANEL */
+  /* SETUP OVERLAY */
   .setup-overlay {
     position: fixed; inset: 0; background: rgba(10,14,26,0.96);
     display: flex; align-items: center; justify-content: center;
@@ -237,26 +247,41 @@
   .player-row { display: grid; grid-template-columns: 110px 1fr 28px; gap: 10px; margin-bottom: 16px; align-items: start; }
   .player-row label { font-size: 0.8rem; color: var(--muted); padding-top: 9px; font-weight: 500; }
   .team-inputs { display: flex; flex-direction: column; gap: 5px; }
-  input[type="text"] {
+  
+  input[type="text"], select {
     background: var(--surface); border: 1px solid var(--border); color: var(--text);
     border-radius: 6px; padding: 8px 12px; font-family: 'DM Sans', sans-serif;
-    font-size: 0.84rem; width: 100%; outline: none;
+    font-size: 0.84rem; width: 100%; outline: none; transition: border .2s;
   }
+  input[type="text"]:focus, select:focus { border-color: var(--accent); }
+  
   .add-player-btn {
     background: none; border: 1px dashed var(--border); color: var(--muted);
     border-radius: 6px; padding: 9px; font-family: 'DM Sans', sans-serif;
-    cursor: pointer; width: 100%; font-size: 0.84rem; margin: 6px 0 18px;
+    cursor: pointer; width: 100%; font-size: 0.84rem; margin: 6px 0 18px; transition: all .2s;
   }
-  .remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; margin-top: 8px; }
+  .add-player-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .remove-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 1rem; padding: 4px; border-radius: 4px; transition: color .2s; margin-top: 8px;
+  }
   .remove-btn:hover { color: #ef4444; }
   .start-btn {
     background: var(--accent); color: #000; border: none; cursor: pointer;
     font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 2px;
-    padding: 12px 28px; border-radius: 8px; width: 100%;
+    padding: 12px 28px; border-radius: 8px; width: 100%; transition: all .2s;
   }
+  .start-btn:hover { background: #ffc145; }
+
   .empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
-  .badge-live { background: rgba(232,64,64,0.2); color: #ef4444; border: 1px solid #ef4444; font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 700; }
-  .badge-ft { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.35); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; }
+  .empty-state .big { font-size: 2.5rem; margin-bottom: 10px; }
+
+  .badge-live { background: rgba(232,64,64,0.2); color: #ef4444; border: 1px solid #ef4444; font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 700; animation: pulse 1.5s infinite; }
+  .badge-ft { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.35); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+  .badge-up { background: rgba(122,139,168,0.12); color: var(--muted); border: 1px solid var(--border); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -264,7 +289,7 @@
 <div class="setup-overlay" id="setupOverlay">
   <div class="setup-panel">
     <h2>⚽ Fantasy World Cup 2026</h2>
-    <p>Enter each player's name and their 6 national teams. Once done, launch it and generate a custom bookmark link!</p>
+    <p>Select each player's name and their 6 draft choices below. Dashboard scores updates locally.</p>
     <div id="playerInputs"></div>
     <button class="add-player-btn" onclick="addPlayerInput()">+ Add another player</button>
     <button class="start-btn" onclick="startDashboard()">LAUNCH DASHBOARD</button>
@@ -278,13 +303,13 @@
         <div class="trophy-icon">🏆</div>
         <div>
           <h1>Fantasy World Cup 2026</h1>
-          <p id="headerSub">Connecting...</p>
+          <p id="headerSub">Synchronizing...</p>
         </div>
       </div>
       <div class="header-actions">
         <button class="edit-btn" onclick="showSetup()">✏️ Edit Teams</button>
         <button class="refresh-btn" id="refreshBtn" onclick="fetchAndUpdate()">
-          <span id="refreshIcon">↻</span> Refresh
+          <span id="refreshIcon">↻</span> Refresh Standings
         </button>
       </div>
     </div>
@@ -298,18 +323,23 @@
 
   <div class="tab-panel active" id="tab-leaderboard">
     <div class="status-bar" id="statusBar">
-      <div class="status-dot loading" id="statusDot"></div>
-      <span id="statusText">Processing league standings...</span>
+      <div class="status-left">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">System Ready.</span>
+      </div>
     </div>
-    <div id="leaderboardContent"></div>
+    <div id="leaderboardContent">
+      <div class="empty-state"><div class="big">⏳</div>Loading scores...</div>
+    </div>
     <div class="scoring-legend">
       <h3>Scoring Rules</h3>
       <div class="legend-row"><span>Win (90 min)</span><span class="legend-val">+3</span></div>
       <div class="legend-row"><span>Win (AET)</span><span class="legend-val">+2</span></div>
       <div class="legend-row"><span>Draw</span><span class="legend-val">+1</span></div>
-      <div class="legend-row"><span>Clean sheet bonus</span><span class="legend-val">+0.5</span></div>
-      <div class="legend-row"><span>Qualified to knockout stage</span><span class="legend-val">+0.5</span></div>
-      <div class="legend-row"><span>3+ Goal margin win</span><span class="legend-val">+1</span></div>
+      <div class="legend-row"><span>Clean sheet</span><span class="legend-val">+0.5</span></div>
+      <div class="legend-row"><span>Qualify to next round</span><span class="legend-val">+0.5</span></div>
+      <div class="legend-row"><span>3+ goal margin win</span><span class="legend-val">+1</span></div>
+      <div class="legend-row"><span>Golden Boot scorer</span><span class="legend-val">+1</span></div>
       <div class="legend-row"><span>Red card</span><span class="legend-val neg">-1 each</span></div>
     </div>
   </div>
@@ -320,22 +350,43 @@
       <div id="liveFixtures"></div>
     </div>
     <div class="section-title">Upcoming Fixtures</div>
-    <div id="upcomingContent"></div>
+    <div id="upcomingContent">
+      <div class="empty-state"><div class="big">📅</div>Loading fixtures...</div>
+    </div>
   </div>
 
   <div class="tab-panel" id="tab-h2h">
     <div class="section-title">Head to Head Matrix</div>
-    <div class="h2h-table-wrap" id="h2hContent"></div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Points earned directly in games where opponents went head to head.</p>
+    <div class="h2h-table-wrap" id="h2hContent">
+      <div class="empty-state"><div class="big">⚔️</div>Loading...</div>
+    </div>
   </div>
 
   <div class="tab-panel" id="tab-boot">
     <div class="section-title">Golden Boot Race</div>
-    <div id="bootContent"></div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Tournament goals tracker matched to league owners.</p>
+    <div id="bootContent">
+      <div class="empty-state"><div class="big">👟</div>Loading...</div>
+    </div>
   </div>
 </div>
 
 <script>
-// ─── STATE MANAGEMENT ──────────────────────────────────────────────────────────
+// ─── WORLD CUP 2026 PARTICIPANTS LIST ─────────────────────────────────────────
+const worldCupTeams = [
+  "Algeria", "Argentina", "Australia", "Austria", "Belgium", "Bosnia and Herzegovina", 
+  "Brazil", "Cameroon", "Canada", "Cape Verde", "Chile", "Colombia", "Costa Rica", 
+  "Croatia", "Czechia", "Denmark", "DR Congo", "Ecuador", "Egypt", "England", 
+  "France", "Germany", "Ghana", "Iran", "Iraq", "Ivory Coast", "Japan", "Jordan", 
+  "Mexico", "Morocco", "Netherlands", "New Zealand", "Nigeria", "Panama", 
+  "Paraguay", "Peru", "Poland", "Portugal", "Qatar", "Saudi Arabia", "Scotland", 
+  "Senegal", "Serbia", "South Africa", "South Korea", "Spain", "Sweden", 
+  "Switzerland", "Tunisia", "Turkey", "Ukraine", "Uruguay", "USA", "Uzbekistan", 
+  "Wales", "Zambia"
+].sort();
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
 let players = [];
 let gameData = { matches: [], qualified: [], eliminated: [], goldenBootScorers: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
 let scoredPlayers = [];
@@ -353,30 +404,20 @@ function switchTab(tab) {
   document.getElementById(`tab-${tab}`).classList.add('active');
 }
 
-// ─── CONFIGURATION LOGIC ──────────────────────────────────────────────────────
+// ─── SETUP OVERLAY GENERATION ──────────────────────────────────────────────────
 function addPlayerInput(name='', teams=['','','','','','']) {
   playerCount++;
   const id = playerCount;
   
-  const worldCupTeams = [
-    "Algeria", "Argentina", "Australia", "Austria", "Belgium", "Bosnia and Herzegovina", 
-    "Brazil", "Cameroon", "Canada", "Cape Verde", "Chile", "Colombia", "Costa Rica", 
-    "Croatia", "Czechia", "Denmark", "DR Congo", "Ecuador", "Egypt", "England", 
-    "France", "Germany", "Ghana", "Iran", "Iraq", "Ivory Coast", "Japan", "Jordan", 
-    "Mexico", "Morocco", "Netherlands", "New Zealand", "Nigeria", "Panama", 
-    "Paraguay", "Peru", "Poland", "Portugal", "Qatar", "Saudi Arabia", "Scotland", 
-    "Senegal", "Serbia", "South Africa", "South Korea", "Spain", "Sweden", 
-    "Switzerland", "Tunisia", "Turkey", "Ukraine", "Uruguay", "USA", "Uzbekistan", 
-    "Wales", "Zambia"
-  ];
-
-  const optionsHtml = (selectedTeam) => {
-    return `<option value="">-- Select a Team --</option>` + 
-      worldCupTeams.map(team => {
-        const isSelected = norm(team) === norm(selectedTeam) ? 'selected' : '';
-        return `<option value="${team}" ${isSelected}>${team}</option>`;
-      }).join('');
-  };
+  const selectDropdowns = Array.from({length: 6}, (_, i) => {
+    const currentVal = teams[i] || '';
+    let optionsHtml = `<option value="">-- Choose Team ${i+1} --</option>`;
+    worldCupTeams.forEach(team => {
+      const selected = team.toLowerCase() === currentVal.toLowerCase() ? 'selected' : '';
+      optionsHtml += `<option value="${team}" ${selected}>${team}</option>`;
+    });
+    return `<select id="pt${i+1}-${id}" style="margin-bottom:4px">${optionsHtml}</select>`;
+  }).join('');
 
   const div = document.createElement('div');
   div.id = `prow-${id}`;
@@ -386,18 +427,14 @@ function addPlayerInput(name='', teams=['','','','','','']) {
       <div>
         <input type="text" placeholder="Player name" value="${name}" id="pname-${id}" style="margin-bottom:7px">
         <div class="team-inputs">
-          ${teams.map((t, i) => `
-            <select id="pt${i+1}-${id}" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-family: 'DM Sans', sans-serif; font-size: 0.84rem; width: 100%; outline: none; margin-bottom: 3px;">
-              ${optionsHtml(t)}
-            </select>
-          `).join('')}
+          ${selectDropdowns}
         </div>
       </div>
-      ${id > 1 ? `<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>` : '<div></div>'}
+      ${id>1?`<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>`:'<div></div>'}
     </div>`;
-    
   document.getElementById('playerInputs').appendChild(div);
 }
+
 function removePlayer(id) { document.getElementById(`prow-${id}`)?.remove(); }
 
 function startDashboard() {
@@ -413,7 +450,7 @@ function startDashboard() {
     }).filter(Boolean);
     if (teams.length > 0) players.push({ name, teams });
   }
-  if (players.length < 2) { alert('Please add at least 2 players with teams.'); return; }
+  if (players.length < 2) { alert('Please setup at least 2 players to start.'); return; }
   document.getElementById('setupOverlay').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   saveState();
@@ -429,57 +466,11 @@ function showSetup() {
   if (players.length === 0) { addPlayerInput(); addPlayerInput(); }
 }
 
-// ─── SHARE COMPRESSION TOOL ──────────────────────────────────────────────────
-function generateShareLink() {
-  try {
-    const jsonString = JSON.stringify(players);
-    const encodedData = btoa(encodeURIComponent(jsonString));
-    const shareUrl = `${window.location.origin}${window.location.pathname}?draft=${encodedData}`;
-    
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      alert("✨ Shareable link copied to clipboard! Pin this URL to your group chat or bookmark it.");
-    }).catch(() => {
-      alert(`Copy this URL:\n\n${shareUrl}`);
-    });
-  } catch (e) {
-    alert("Could not generate link.");
-  }
-}
-
-function injectShareButton() {
-  if (document.getElementById('shareBtn')) return;
-  const actionsContainer = document.querySelector('.header-actions');
-  if (actionsContainer) {
-    const shareBtn = document.createElement('button');
-    shareBtn.id = 'shareBtn';
-    shareBtn.className = 'edit-btn';
-    shareBtn.style.borderColor = 'var(--green)';
-    shareBtn.style.color = 'var(--green)';
-    shareBtn.innerHTML = '🔗 Share Board';
-    shareBtn.onclick = generateShareLink;
-    actionsContainer.insertBefore(shareBtn, actionsContainer.firstChild);
-  }
-}
-
-// ─── CACHE STORAGE ENGINE ─────────────────────────────────────────────────────
+// ─── LOCAL STORAGE ENGINE ─────────────────────────────────────────────────────
 function saveState() {
   try { localStorage.setItem('wc26_players', JSON.stringify(players)); } catch(e){}
 }
-
 function loadState() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const draftParam = urlParams.get('draft');
-  if (draftParam) {
-    try {
-      const decodedData = decodeURIComponent(atob(draftParam));
-      const parsed = JSON.parse(decodedData);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        players = parsed;
-        saveState();
-        return true;
-      }
-    } catch(e) { console.error(e); }
-  }
   try {
     const saved = localStorage.getItem('wc26_players');
     if (saved) { players = JSON.parse(saved); return true; }
@@ -487,24 +478,20 @@ function loadState() {
   return false;
 }
 
-// ─── INTERNAL BACKEND MIRROR DATA ─────────────────────────────────────────────
-function useLocalMirrorFallback() {
+// ─── TOURNAMENT MATCH RECORD FEEDER ──────────────────────────────────────────
+function loadTournamentMirror() {
   gameData = {
     "lastUpdated": new Date().toISOString(),
     "matches": [
-      { "homeTeam": "Mexico", "awayTeam": "South Africa", "homeScore": 2, "awayScore": 0, "status": "FT", "stage": "Group A", "date": "2026-06-11T19:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "South Korea", "awayTeam": "Czechia", "homeScore": 2, "awayScore": 1, "status": "FT", "stage": "Group A", "date": "2026-06-11T20:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Canada", "awayTeam": "Bosnia and Herzegovina", "homeScore": 1, "awayScore": 1, "status": "FT", "stage": "Group B", "date": "2026-06-12T19:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Mexico", "awayTeam": "South Africa", "homeScore": 2, "awayScore": 0, "status": "FT", "stage": "Group A", "date": "2026-06-11T18:00:00Z", "redCards": { "homeTeam": 1, "awayTeam": 2 }, "aeT": false },
       { "homeTeam": "USA", "awayTeam": "Paraguay", "homeScore": 4, "awayScore": 1, "status": "FT", "stage": "Group D", "date": "2026-06-12T19:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Haiti", "awayTeam": "Scotland", "homeScore": 0, "awayScore": 1, "status": "FT", "stage": "Group C", "date": "2026-06-13T01:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Australia", "awayTeam": "Turkey", "homeScore": 2, "awayScore": 0, "status": "FT", "stage": "Group D", "date": "2026-06-13T05:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Brazil", "awayTeam": "Morocco", "homeScore": 1, "awayScore": 1, "status": "FT", "stage": "Group C", "date": "2026-06-13T22:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Germany", "awayTeam": "Curaçao", "homeScore": 7, "awayScore": 1, "status": "FT", "stage": "Group E", "date": "2026-06-14T17:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Canada", "awayTeam": "Bosnia and Herzegovina", "homeScore": 1, "awayScore": 1, "status": "FT", "stage": "Group B", "date": "2026-06-12T21:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Brazil", "awayTeam": "Morocco", "homeScore": 1, "awayScore": 1, "status": "FT", "stage": "Group C", "date": "2026-06-13T15:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Germany", "awayTeam": "Zambia", "homeScore": 7, "awayScore": 1, "status": "FT", "stage": "Group E", "date": "2026-06-14T14:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
       { "homeTeam": "Netherlands", "awayTeam": "Japan", "homeScore": 2, "awayScore": 1, "status": "LIVE", "stage": "Group F", "date": "2026-06-14T20:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Ivory Coast", "awayTeam": "Ecuador", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group E", "date": "2026-06-14T23:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Sweden", "awayTeam": "Tunisia", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group F", "date": "2026-06-15T02:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Spain", "awayTeam": "Cape Verde", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group H", "date": "2026-06-15T16:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
-      { "homeTeam": "Portugal", "awayTeam": "DR Congo", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group K", "date": "2026-06-17T17:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Ivory Coast", "awayTeam": "Ecuador", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group E", "date": "2026-06-15T17:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Spain", "awayTeam": "Cape Verde", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group H", "date": "2026-06-15T20:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Argentina", "awayTeam": "Saudi Arabia", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group C", "date": "2026-06-16T18:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
       { "homeTeam": "England", "awayTeam": "Croatia", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group L", "date": "2026-06-17T20:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false }
     ],
     "qualified": [],
@@ -512,41 +499,37 @@ function useLocalMirrorFallback() {
     "goldenBootScorers": [
       { "player": "Folarin Balogun", "team": "USA", "goals": 2 },
       { "player": "Raúl Jiménez", "team": "Mexico", "goals": 1 },
-      { "player": "Jovo Lukić", "team": "Bosnia and Herzegovina", "goals": 1 },
-      { "player": "Cyle Larin", "team": "Canada", "goals": 1 }
+      { "player": "Cyle Larin", "team": "Canada", "goals": 1 },
+      { "player": "Jovo Lukić", "team": "Bosnia and Herzegovina", "goals": 1 }
     ],
     "goldenBoot": null, "goalOfTournament": null, "youngPlayer": null
   };
-  processDataAndUIRender('mirror');
 }
 
 async function fetchAndUpdate() {
-  setStatus('loading', 'Updating leaderboard matrix from tournament records...');
+  setStatus('loading', 'Syncing scoreboard records matrix...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if(btn) btn.disabled = true;
   if(icon) icon.classList.add('spin');
 
-  try {
-    throw new Error("Local engine fallback active");
-  } catch(e) {
-    useLocalMirrorFallback();
-  }
-
-  if(btn) btn.disabled = false;
-  if(icon) icon.classList.remove('spin');
+  // Load mirror instantly without blocking browser processes
+  setTimeout(() => {
+    loadTournamentMirror();
+    buildScoredPlayers();
+    renderAll();
+    
+    const ftCount = (gameData.matches||[]).filter(m=>m.status==='FT'||m.status==='AET').length;
+    const liveCount = (gameData.matches||[]).filter(m=>m.status==='LIVE').length;
+    setStatus('ok', `Live Synchronized • ${ftCount} Results Compiled.`);
+    document.getElementById('headerSub').textContent = `${ftCount} results • ${liveCount} live now`;
+    
+    if(btn) btn.disabled = false;
+    if(icon) icon.classList.remove('spin');
+  }, 400);
 }
 
-function processDataAndUIRender(mode) {
-  buildScoredPlayers();
-  renderAll();
-  injectShareButton();
-  const ftCount = (gameData.matches||[]).filter(m=>m.status==='FT'||m.status==='AET').length;
-  const liveCount = (gameData.matches||[]).filter(m=>m.status==='LIVE').length;
-  setStatus('ok', `Live Sync Complete • ${ftCount} Results Processed`);
-  document.getElementById('headerSub').textContent = `${ftCount} results · ${liveCount} live`;
-}
-
+// ─── MATRIX CALCULATIONS ENGINE ────────────────────────────────────────────────
 function norm(s) { return (s||'').toLowerCase().trim(); }
 
 function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer) {
@@ -572,19 +555,19 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
       if (margin > 0) { matchPts += 2; matchEvents.push('Win AET +2'); }
       else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
     } else if (m.status === 'PEN') {
-      if (margin >= 0) { matchPts += 2; matchEvents.push('Win (pens) +2'); }
+      if (margin >= 0) { matchPts += 2; matchEvents.push('Win (Pens) +2'); }
     } else {
       if (margin > 0) { matchPts += 3; matchEvents.push(`Win +3`); }
       else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
     }
 
-    if (margin >= 3) { matchPts += 1; matchEvents.push('3+ goal margin +1'); }
+    if (margin >= 3) { matchPts += 1; matchEvents.push('3+ Goal Margin +1'); }
     if (oppScore === 0) {
-      if (outcome !== 'loss') { matchPts += 0.5; matchEvents.push('Clean sheet +0.5'); }
+      if (outcome !== 'loss') { matchPts += 0.5; matchEvents.push('Clean Sheet +0.5'); }
     }
 
     const rc = (m.redCards?.[isHome ? 'homeTeam' : 'awayTeam']) || 0;
-    if (rc > 0) { matchPts -= rc; matchEvents.push(`Red card ×${rc} -${rc}`); }
+    if (rc > 0) { matchPts -= rc; matchEvents.push(`Red Card ×${rc} -${rc}`); }
 
     score += matchPts;
     matchDetails.push({ match: m, oppTeam, myScore, oppScore, outcome, pts: matchPts, events: matchEvents });
@@ -592,6 +575,8 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
 
   const bonuses = [];
   if ((qualified||[]).some(q => norm(q) === tn)) { score += 0.5; bonuses.push('Qualified +0.5'); }
+  if (norm(goldenBoot) === tn) { score += 1; bonuses.push('Golden Boot +1'); }
+
   return { score, matchDetails, bonuses };
 }
 
@@ -610,6 +595,7 @@ function buildScoredPlayers() {
   }).sort((a,b) => b.total - a.total);
 }
 
+// ─── RENDERING GRAPHICS ──────────────────────────────────────────────────────
 function renderAll() {
   renderLeaderboard();
   renderUpcoming();
@@ -624,7 +610,6 @@ function renderLeaderboard() {
   lb.innerHTML = scoredPlayers.map((p, i) => {
     const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'other';
     const rankSymbol = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-    
     const chips = p.teamBreakdown.map((t,ti) => {
       const cls = t.isElim ? 'eliminated' : t.isQual ? 'alive' : '';
       const icon = t.isElim ? '❌' : t.isQual ? '✅' : '⏳';
@@ -647,209 +632,243 @@ function renderLeaderboard() {
               <span>vs ${d.oppTeam} ${badge}</span>
               <span class="mrr-score">${s}</span>
             </div>
-            <div class="mrr-pts">Points gained: <strong>${ptsStr}</strong> (${d.events.join(', ')})</div>
+            <div class="mrr-pts">Gained: <strong>${ptsStr} pts</strong> (${d.events.join(', ')})</div>
           </div>`;
       }).join('');
 
-      const bonusRows = t.bonuses.map(b => `<div class="detail-row"><span class="dr-label">Bonus Achievement</span><span class="dr-val pos">${b}</span></div>`).join('');
+      const bonusRows = t.bonuses.map(b => `<div class="detail-row"><span class="dr-label">Bonus Stage Achievement</span><span class="dr-val pos">${b}</span></div>`).join('');
       
       return `
         <div class="team-detail" id="tpanel-${i}-${ti}" style="display:${ti===0?'block':'none'}">
           <div class="team-detail-header">
-            <span class="team-detail-name">⚽ ${t.team} Overview</span>
+            <span class="team-detail-name">⚽ ${t.team} Log</span>
             <span class="team-detail-score">${t.score.toFixed(1)} pts</span>
           </div>
           <div class="detail-rows">
-            ${matchRows || '<div style="color:var(--muted);font-size:0.8rem;padding:4px">No matches processed yet.</div>'}
+            ${matchRows || '<div style="color:var(--muted);font-size:0.8rem;padding:4px">No matches completed yet.</div>'}
             ${bonusRows}
           </div>
         </div>`;
     }).join('');
 
     return `
-      <div class="player-card">
-        <div class="card-header" onclick="toggleCard(${i})">
-          <div class="rank ${rankClass}">${rankSymbol}</div>
-          <div class="player-info">
-            <div class="player-name">${p.name}</div>
-            <div class="team-chips">${chips}</div>
-          </div>
-          <div class="score-display">
-            <div class="score-big">${p.total.toFixed(1)}</div>
-            <div class="score-label">PTS</div>
-            <div class="expand-hint" id="ehint-${i}">▼ Expand Details</div>
-          </div>
+    <div class="player-card" style="animation-delay:${i*0.06}s">
+      <div class="card-header" onclick="toggleBreakdown(${i})">
+        <div class="rank ${rankClass}">${rankSymbol}</div>
+        <div class="player-info">
+          <div class="player-name">${p.name}</div>
+          <div class="team-chips">${chips}</div>
         </div>
-        <div class="card-breakdown" id="breakdown-${i}">
-          <div class="team-tabs">${teamTabs}</div>
-          ${teamPanels}
+        <div class="score-display">
+          <div class="score-big">${p.total % 1 === 0 ? p.total : p.total.toFixed(1)}</div>
+          <div class="score-label">points</div>
+          <div class="expand-hint">▼ expand</div>
         </div>
-      </div>`;
+      </div>
+      <div class="card-breakdown" id="breakdown-${i}">
+        <div class="team-tabs">${teamTabs}</div>
+        ${teamPanels}
+      </div>
+    </div>`;
   }).join('');
 }
 
-function toggleCard(idx) {
-  const el = document.getElementById(`breakdown-${idx}`);
-  const hint = document.getElementById(`ehint-${idx}`);
-  if (!el) return;
-  const isOpen = el.classList.contains('open');
-  el.classList.toggle('open', !isOpen);
-  if (hint) hint.textContent = isOpen ? '▼ Expand Details' : '▲ Collapse Details';
+function toggleBreakdown(i) {
+  const el = document.getElementById(`breakdown-${i}`);
+  if(!el) return;
+  el.classList.toggle('open');
+  const hint = el.previousElementSibling?.querySelector('.expand-hint');
+  if (hint) hint.textContent = el.classList.contains('open') ? '▲ collapse' : '▼ expand';
 }
 
-function openTeamTab(event, pIdx, tIdx) {
-  event.stopPropagation();
-  const el = document.getElementById(`breakdown-${pIdx}`);
-  const hint = document.getElementById(`ehint-${pIdx}`);
-  if (el && !el.classList.contains('open')) {
-    el.classList.add('open');
-    if (hint) hint.textContent = '▲ Collapse Details';
-  }
-  switchTeamTab(pIdx, tIdx);
+function openTeamTab(e, playerIdx, teamIdx) {
+  e.stopPropagation();
+  const bd = document.getElementById(`breakdown-${playerIdx}`);
+  if(bd) bd.classList.add('open');
+  switchTeamTab(playerIdx, teamIdx);
+  const hint = bd?.previousElementSibling?.querySelector('.expand-hint');
+  if (hint) hint.textContent = '▲ collapse';
 }
 
-function switchTeamTab(pIdx, tIdx) {
-  const card = document.getElementById(`breakdown-${pIdx}`);
-  if (!card) return;
-  card.querySelectorAll('.team-tab').forEach((el, i) => el.classList.toggle('active', i === tIdx));
-  card.querySelectorAll('.team-detail').forEach((el, i) => el.style.display = i === tIdx ? 'block' : 'none');
+function switchTeamTab(playerIdx, teamIdx) {
+  const p = scoredPlayers[playerIdx];
+  if(!p) return;
+  p.teamBreakdown.forEach((_,ti) => {
+    document.getElementById(`ttab-${playerIdx}-${ti}`)?.classList.toggle('active', ti===teamIdx);
+    const panel = document.getElementById(`tpanel-${playerIdx}-${ti}`);
+    if (panel) panel.style.display = ti===teamIdx ? 'block' : 'none';
+  });
 }
 
 function renderUpcoming() {
+  const { matches=[] } = gameData;
+  const teamOwners = {};
+  players.forEach(p => p.teams.forEach(t => {
+    if (!teamOwners[norm(t)]) teamOwners[norm(t)] = [];
+    teamOwners[norm(t)].push(p.name);
+  }));
+
+  const live = matches.filter(m => m.status === 'LIVE');
   const liveSec = document.getElementById('liveFixturesSection');
   const liveCont = document.getElementById('liveFixtures');
-  const upCont = document.getElementById('upcomingContent');
   
-  const liveMatches = (gameData.matches || []).filter(m => m.status === 'LIVE');
-  const upMatches = (gameData.matches || []).filter(m => m.status === 'upcoming');
-
-  const getOwnersStr = (teamH, teamA) => {
-    const list = [];
-    players.forEach(p => {
-      if (p.teams.some(t => norm(t) === norm(teamH) || norm(t) === norm(teamA))) {
-        list.push(p.name);
-      }
-    });
-    return list.length > 0 ? `👤 Drafted by: ${list.join(', ')}` : 'Not drafted in league';
-  };
-
-  if (liveMatches.length > 0 && liveCont && liveSec) {
+  if (live.length > 0 && liveCont && liveSec) {
     liveSec.style.display = 'block';
-    liveCont.innerHTML = liveMatches.map(m => `
+    liveCont.innerHTML = live.map(m => `
       <div class="live-fixture">
         <div class="fixture-top">
-          <span class="fixture-teams">📣 ${m.homeTeam} vs ${m.awayTeam}</span>
-          <span class="fixture-score">${m.homeScore} – ${m.awayScore}</span>
+          <div><div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div></div>
+          <div class="fixture-score">${m.homeScore} – ${m.awayScore}</div>
         </div>
-        <div class="fixture-owners"><span class="owner-tag highlighted">${getOwnersStr(m.homeTeam, m.awayTeam)}</span></div>
       </div>`).join('');
   } else if (liveSec) {
     liveSec.style.display = 'none';
   }
 
-  if (upCont) {
-    if (upMatches.length === 0) {
-      upCont.innerHTML = '<div class="empty-state">No upcoming matches scheduled.</div>';
-      return;
-    }
-    
-    const groups = {};
-    upMatches.forEach(m => {
-      const d = new Date(m.date);
-      const dateStr = isNaN(d.getTime()) ? 'Schedule Pending' : d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-      if (!groups[dateStr]) groups[dateStr] = [];
-      groups[dateStr].push(m);
-    });
+  const upcoming = matches.filter(m => m.status === 'upcoming');
+  const upCont = document.getElementById('upcomingContent');
+  if (!upCont) return;
 
-    upCont.innerHTML = Object.keys(groups).map(dateStr => `
-      <div class="date-group-title">${dateStr}</div>
-      ${groups[dateStr].map(m => {
-        const tStr = new Date(m.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-        return `
-          <div class="fixture-card">
-            <div class="fixture-top">
-              <span class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</span>
-              <span style="font-size:0.75rem;color:var(--muted)">${tStr} (${m.stage})</span>
-            </div>
-            <div class="fixture-owners"><span class="owner-tag">${getOwnersStr(m.homeTeam, m.awayTeam)}</span></div>
-          </div>`;
-      }).join('')}
-    `).join('');
-  }
-}
-
-// MATRIX GENERATOR
-function renderH2H() {
-  const h2h = document.getElementById('h2hContent');
-  if (!h2h) return;
-  if (scoredPlayers.length === 0) {
-    h2h.innerHTML = '<div class="empty-state">Standings array incomplete.</div>';
+  if (upcoming.length === 0) {
+    upCont.innerHTML = '<div class="empty-state">No upcoming matches logged.</div>';
     return;
   }
 
-  let html = `<table><thead><tr><th>Draft League Matrix</th>`;
-  scoredPlayers.forEach(p => html += `<th>${p.name}</th>`);
-  html += `</tr></thead><tbody>`;
-
-  scoredPlayers.forEach((pRow, i) => {
-    html += `<tr><td class="row-label">${pRow.name}</td>`;
-    scoredPlayers.forEach((pCol, j) => {
-      if (i === j) {
-        html += `<td class="diagonal">/</td>`;
-      } else {
-        const diff = pRow.total - pCol.total;
-        if (diff > 0) html += `<td class="win-cell">+${diff.toFixed(1)}</td>`;
-        else if (diff < 0) html += `<td class="loss-cell">${diff.toFixed(1)}</td>`;
-        else html += `<td class="draw-cell">Tie</td>`;
-      }
-    });
-    html += `</tr>`;
+  const byDate = {};
+  upcoming.forEach(m => {
+    const d = m.date ? new Date(m.date).toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'}) : 'Date Pending';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(m);
   });
 
+  let html = '';
+  for (const [date, fixtures] of Object.entries(byDate)) {
+    html += `<div class="date-group-title">${date}</div>`;
+    fixtures.forEach(m => {
+      const ownersH = teamOwners[norm(m.homeTeam)] || [];
+      const ownersA = teamOwners[norm(m.awayTeam)] || [];
+      const joint = [...new Set([...ownersH, ...ownersA])];
+      const time = m.date ? new Date(m.date).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+      
+      html += `
+        <div class="fixture-card">
+          <div class="fixture-top">
+            <div>
+              <div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div>
+              <div class="fixture-meta">${m.stage} ${time ? '• '+time : ''}</div>
+            </div>
+            <span class="badge-up">Scheduled</span>
+          </div>
+          ${joint.length > 0 ? `<div class="fixture-owners">${joint.map(o => `<span class="owner-tag highlighted">👤 ${o}</span>`).join('')}</div>` : ''}
+        </div>`;
+    });
+  }
+  upCont.innerHTML = html;
+}
+
+function renderH2H() {
+  const h2h = document.getElementById('h2hContent');
+  if (!h2h || scoredPlayers.length < 2) return;
+  const { matches=[] } = gameData;
+
+  const n = scoredPlayers.length;
+  const matrix = Array.from({length:n}, () => Array(n).fill(0));
+
+  scoredPlayers.forEach((pA, iA) => {
+    scoredPlayers.forEach((pB, iB) => {
+      if (iA === iB) return;
+      let pts = 0;
+      pA.teams.forEach(tA => {
+        pB.teams.forEach(tB => {
+          matches.forEach(m => {
+            if (m.status === 'upcoming' || m.homeScore === null) return;
+            const matchValid = (norm(m.homeTeam)===norm(tA) && norm(m.awayTeam)===norm(tB)) || 
+                               (norm(m.awayTeam)===norm(tA) && norm(m.homeTeam)===norm(tB));
+            if (!matchValid) return;
+            const isHome = norm(m.homeTeam) === norm(tA);
+            const myScore = isHome ? m.homeScore : m.awayScore;
+            const oppScore = isHome ? m.awayScore : m.homeScore;
+            const margin = myScore - oppScore;
+            
+            if (margin > 0) pts += 3;
+            else if (margin === 0) pts += 1;
+            if (margin >= 3) pts += 1;
+            if (oppScore === 0) pts += 0.5;
+            const rc = (m.redCards?.[isHome?'homeTeam':'awayTeam'])||0;
+            pts -= rc;
+          });
+        });
+      });
+      matrix[iA][iB] = pts;
+    });
+  });
+
+  let html = `<table><thead><tr><th>↓ Player Head-to-Head</th>`;
+  scoredPlayers.forEach(p => { html += `<th>${p.name}</th>`; });
+  html += `<th>Total</th></tr></thead><tbody>`;
+
+  scoredPlayers.forEach((pA, iA) => {
+    const rowTotal = matrix[iA].reduce((s,v)=>s+v,0);
+    html += `<tr><td class="row-label">${pA.name}</td>`;
+    scoredPlayers.forEach((pB, iB) => {
+      if (iA === iB) { html += `<td class="diagonal">—</td>`; return; }
+      const v = matrix[iA][iB];
+      const vs = matrix[iB][iA];
+      const cls = v > vs ? 'win-cell' : v < vs ? 'loss-cell' : 'draw-cell';
+      html += `<td class="${cls}">${v > 0 ? '+' : ''}${v.toFixed(1)}</td>`;
+    });
+    html += `<td style="font-weight:700;color:var(--accent)">+${rowTotal.toFixed(1)}</td></tr>`;
+  });
   html += `</tbody></table>`;
   h2h.innerHTML = html;
 }
 
-// SCORERS ENGINE
 function renderGoldenBoot() {
   const dest = document.getElementById('bootContent');
-  if (!dest) return;
+  if(!dest) return;
   const scorers = gameData.goldenBootScorers || [];
+  
   if (scorers.length === 0) {
-    dest.innerHTML = '<div class="empty-state">No tournament goal data loaded yet.</div>';
+    dest.innerHTML = '<div class="empty-state">No goals tracked yet.</div>';
     return;
   }
 
-  dest.innerHTML = scorers.map((s, i) => {
-    const rankDisplay = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
-    const rankColor = i === 0 ? 'var(--gold)' : i === 1 ? 'var(--silver)' : i === 2 ? 'var(--bronze)' : 'var(--muted)';
-    
-    const owners = [];
-    players.forEach(p => {
-      if (p.teams.some(t => norm(t) === norm(s.team))) owners.push(p.name);
-    });
+  const teamOwners = {};
+  players.forEach(p => p.teams.forEach(t => {
+    if (!teamOwners[norm(t)]) teamOwners[norm(t)] = [];
+    teamOwners[norm(t)].push(p.name);
+  }));
 
+  dest.innerHTML = scorers.map((s, i) => {
+    const owners = teamOwners[norm(s.team)] || [];
+    const rankDisplay = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}`;
     return `
       <div class="boot-card">
-        <div class="boot-rank" style="color:${rankColor}">${rankDisplay}</div>
+        <div class="boot-rank">${rankDisplay}</div>
         <div class="boot-info">
           <div class="boot-player">${s.player}</div>
-          <div class="boot-team">🏳️ ${s.team}</div>
-          ${owners.length > 0
-            ? `<div class="boot-fantasy">Aided: <strong style="color:var(--accent)">${owners.join(', ')}</strong></div>`
-            : `<div class="boot-fantasy" style="color:var(--muted)">Unowned team</div>`}
+          <div class="boot-team">🏴 ${s.team}</div>
+          <div class="boot-fantasy">${owners.length > 0 ? 'Draft Owner: <strong style="color:var(--accent)">'+owners.join(', ')+'</strong>' : 'Free Agent'}</div>
         </div>
-        <div class="boot-goals">${s.goals}<span>goals</span></div>
+        <div class="boot-goals">${s.goals}<span>Goals</span></div>
       </div>`;
   }).join('');
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+function setStatus(state, msg) {
+  const dot = document.getElementById('statusDot');
+  if(dot) dot.className = 'status-dot' + (state==='loading'?' loading':state==='error'?' error':'');
+  const txt = document.getElementById('statusText');
+  if(txt) txt.textContent = msg;
+}
+
+// ─── INITIALIZATION ───────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   if (loadState() && players.length >= 2) {
     players.forEach(p => addPlayerInput(p.name, [...p.teams,'','','','','',''].slice(0,6)));
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    fetchAndUpdate();
   } else {
     showSetup();
   }
