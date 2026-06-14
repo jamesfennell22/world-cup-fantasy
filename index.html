@@ -368,8 +368,7 @@
       <div class="tab active" onclick="switchTab('leaderboard')">🥇 Leaderboard</div>
       <div class="tab" onclick="switchTab('upcoming')">📅 Upcoming</div>
       <div class="tab" onclick="switchTab('h2h')">⚔️ Head to Head</div>
-      <div class="tab" onclick="switchTab('boot')">👟 Golden Boot</div>
-    </div>
+      </div>
   </header>
 
   <div class="tab-panel active" id="tab-leaderboard">
@@ -414,14 +413,7 @@
     </div>
   </div>
 
-  <div class="tab-panel" id="tab-boot">
-    <div class="section-title">Golden Boot Race</div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Top scorers — and which fantasy player owns their team.</p>
-    <div id="bootContent">
-      <div class="empty-state"><div class="big">👟</div>Loading...</div>
-    </div>
   </div>
-</div>
 
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -435,8 +427,8 @@ let activeTab = 'leaderboard';
 function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach((el,i) => {
-    const tabs = ['leaderboard','upcoming','h2h','boot'];
-    el.classList.toggle('active', tabs[i] === tab);
+    const tabs = ['leaderboard','upcoming','h2h'];
+    if (tabs[i]) el.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.add('active');
@@ -552,16 +544,7 @@ async function fetchAndUpdate() {
       matches: convertedMatches,
       qualified: [],
       eliminated: [],
-      goldenBootScorers: [
-        {"player": "Kylian Mbappé", "team": "France", "goals": 4},
-        {"player": "Vinícius Júnior", "team": "Brazil", "goals": 3},
-        {"player": "Folarin Balogun", "team": "USA", "goals": 2},
-        {"player": "Harry Kane", "team": "England", "goals": 2},
-        {"player": "Lionel Messi", "team": "Argentina", "goals": 2},
-        {"player": "Raúl Jiménez", "team": "Mexico", "goals": 1},
-        {"player": "Arda Güler", "team": "Turkey", "goals": 1},
-        {"player": "Julio Enciso", "team": "Paraguay", "goals": 1}
-      ],
+      goldenBootScorers: [],
       goldenBoot: null, goalOfTournament: null, youngPlayer: null
     };
 
@@ -614,7 +597,7 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
     const isAway = norm(m.awayTeam) === tn;
     if (!isHome && !isAway) continue;
 
-    matchCount++; // Increment completed game match counter
+    matchCount++;
 
     const myScore = isHome ? m.homeScore : m.awayScore;
     const oppScore = isHome ? m.awayScore : m.homeScore;
@@ -653,6 +636,7 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
   return { score, matchDetails, bonuses, matchCount };
 }
 
+// ─── BUILD PLAYER METRICS ─────────────────────────────────────────────────────
 function buildScoredPlayers() {
   const { matches=[], qualified=[], eliminated=[], goldenBoot, goalOfTournament, youngPlayer } = gameData;
   scoredPlayers = players.map(p => {
@@ -675,7 +659,6 @@ function renderAll() {
   renderLeaderboard();
   renderUpcoming();
   renderH2H();
-  renderGoldenBoot();
 }
 
 function renderLeaderboard() {
@@ -847,7 +830,7 @@ function renderUpcoming() {
   document.getElementById('upcomingContent').innerHTML = html;
 }
 
-// ─── HEAD TO HEAD / GOALS ─────────────────────────────────────────────────────
+// ─── HEAD TO HEAD MATRIX ─────────────────────────────────────────────────────
 function renderH2H() {
   if (scoredPlayers.length < 2) return;
   const { matches=[] } = gameData;
@@ -900,33 +883,6 @@ function renderH2H() {
   });
   html += `</tbody></table>`;
   document.getElementById('h2hContent').innerHTML = html;
-}
-
-function renderGoldenBoot() {
-  const scorers = (gameData.goldenBootScorers || []);
-  if (scorers.length === 0) {
-    document.getElementById('bootContent').innerHTML = `<div class="empty-state">No goals recorded yet.</div>`;
-    return;
-  }
-  const teamOwners = {};
-  players.forEach(p => p.teams.forEach(t => {
-    if (!teamOwners[norm(t)]) teamOwners[norm(t)] = [];
-    teamOwners[norm(t)].push(p.name);
-  }));
-
-  let html = scorers.map((s, i) => {
-    const owners = teamOwners[norm(s.team)] || [];
-    return `<div class="boot-card">
-      <div class="boot-rank">${i+1}</div>
-      <div class="boot-info">
-        <div class="boot-player">${s.player}</div>
-        <div class="boot-team">🏳️ ${s.team}</div>
-        <div class="boot-fantasy">Owner: <strong style="color:var(--accent)">${owners.length > 0 ? owners.join(', ') : 'Free Agent'}</strong></div>
-      </div>
-      <div class="boot-goals">${s.goals}<span>goals</span></div>
-    </div>`;
-  }).join('');
-  document.getElementById('bootContent').innerHTML = html;
 }
 
 function setStatus(state, msg) {
