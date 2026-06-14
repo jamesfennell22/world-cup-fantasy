@@ -569,13 +569,21 @@ async function fetchAndUpdate() {
     buildScoredPlayers();
     renderAll();
     
+    // Safety unblock: Ensure app workspace is always visible upon feed collection loop
+    document.getElementById('app').style.display = 'block';
+    
     const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
     setStatus('ok', `Synchronized live feed • Updated ${new Date().toLocaleTimeString()}`);
     document.getElementById('headerSub').textContent = `${ftCount} matches compiled successfully`;
 
   } catch(e) {
     console.error(e);
-    setStatus('error', 'API connection offline. Using saved state.');
+    setStatus('error', 'API connection offline. Using saved local state.');
+    
+    // Safety layout unlock: Force dashboard visibility during live network drops
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('headerSub').textContent = 'Local Mode (Offline)';
+    
     buildScoredPlayers();
     renderAll();
   }
@@ -738,6 +746,7 @@ function toggleBreakdown(i) {
   if (hint) hint.textContent = el.classList.contains('open') ? '▲ collapse' : '▼ expand';
 }
 
+// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function openTeamTab(e, playerIdx, teamIdx) {
   e.stopPropagation();
   const bd = document.getElementById(`breakdown-${playerIdx}`);
@@ -756,7 +765,6 @@ function switchTeamTab(playerIdx, teamIdx) {
   });
 }
 
-// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function renderUpcoming() {
   const { matches=[] } = gameData;
   const teamOwners = {};
