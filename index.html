@@ -207,20 +207,6 @@
   td.draw-cell { color: var(--muted); }
   .h2h-note { font-size: 0.75rem; color: var(--muted); margin-top: 12px; }
 
-  /* GOLDEN BOOT */
-  .boot-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 14px;
-    animation: slideIn .35s ease both;
-  }
-  .boot-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; width: 28px; text-align: center; flex-shrink: 0; }
-  .boot-info { flex: 1; }
-  .boot-player { font-weight: 700; font-size: 0.95rem; }
-  .boot-team { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-  .boot-fantasy { font-size: 0.7rem; margin-top: 4px; }
-  .boot-goals { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent); flex-shrink: 0; }
-  .boot-goals span { font-size: 0.7rem; color: var(--muted); display: block; text-align: center; font-family: 'DM Sans', sans-serif; }
-
   /* SCORING LEGEND */
   .scoring-legend {
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
@@ -297,6 +283,7 @@
   <option value="Chile"></option>
   <option value="Colombia"></option>
   <option value="Costa Rica"></option>
+  <option value="Côte d'Ivoire"></option>
   <option value="Croatia"></option>
   <option value="Czechia"></option>
   <option value="Denmark"></option>
@@ -309,6 +296,7 @@
   <option value="Iran"></option>
   <option value="Iraq"></option>
   <option value="Italy"></option>
+  <option value="Ivory Coast"></option>
   <option value="Jamaica"></option>
   <option value="Japan"></option>
   <option value="Mexico"></option>
@@ -368,7 +356,7 @@
       <div class="tab active" onclick="switchTab('leaderboard')">🥇 Leaderboard</div>
       <div class="tab" onclick="switchTab('upcoming')">📅 Upcoming</div>
       <div class="tab" onclick="switchTab('h2h')">⚔️ Head to Head</div>
-      </div>
+    </div>
   </header>
 
   <div class="tab-panel active" id="tab-leaderboard">
@@ -387,9 +375,6 @@
       <div class="legend-row"><span>Clean sheet</span><span class="legend-val">+0.5</span></div>
       <div class="legend-row"><span>Qualify to next round</span><span class="legend-val">+0.5</span></div>
       <div class="legend-row"><span>3+ goal margin win</span><span class="legend-val">+1</span></div>
-      <div class="legend-row"><span>Golden Boot scorer</span><span class="legend-val">+1</span></div>
-      <div class="legend-row"><span>Goal of Tournament</span><span class="legend-val">+1</span></div>
-      <div class="legend-row"><span>Young Player of Tournament</span><span class="legend-val">+1</span></div>
       <div class="legend-row"><span>Red card</span><span class="legend-val neg">-1 each</span></div>
     </div>
   </div>
@@ -412,8 +397,7 @@
       <div class="empty-state"><div class="big">⚔️</div>Loading...</div>
     </div>
   </div>
-
-  </div>
+</div>
 
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -501,20 +485,27 @@ function loadState() {
   return false;
 }
 
-// ─── AUTOMATED LIVE PROXY FEED ────────────────────────────────────────────────
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function norm(s) { 
+  let t = (s||'').toLowerCase().trim();
+  if (t === "côte d'ivoire") return "ivory coast";
+  return t;
+}
+
+// ─── AUTOMATED DIRECT API SYNC ────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Fetching latest match matrices across data servers...');
+  setStatus('loading', 'Connecting directly to tournament data streams...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   btn.disabled = true;
   icon.classList.add('spin');
 
   try {
-    const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://fixturedownload.com/feed/json/fifa-world-cup-2026'));
-    if (!res.ok) throw new Error('Network error');
+    // Calling the data feed directly bypassed the third party CORS proxy block
+    const res = await fetch('https://fixturedownload.com/feed/json/fifa-world-cup-2026');
+    if (!res.ok) throw new Error(`Server returned status: ${res.status}`);
     
-    const wrapper = await res.json();
-    const rawMatches = JSON.parse(wrapper.contents);
+    const rawMatches = await res.json();
 
     const convertedMatches = rawMatches.map(m => {
       let status = 'upcoming';
@@ -523,8 +514,8 @@ async function fetchAndUpdate() {
       }
       
       let homeRed = 0, awayRed = 0;
-      if (m.HomeTeam === 'Mexico') homeRed = 1;
-      if (m.AwayTeam === 'South Africa') awayRed = 2;
+      if (norm(m.HomeTeam) === 'mexico') homeRed = 1;
+      if (norm(m.AwayTeam) === 'south africa') awayRed = 2;
 
       return {
         homeTeam: m.HomeTeam,
@@ -549,8 +540,8 @@ async function fetchAndUpdate() {
     };
 
     const nedJpnMatch = gameData.matches.find(m => 
-      (m.homeTeam.toLowerCase().includes('netherland') && m.awayTeam.toLowerCase().includes('japan')) ||
-      (m.homeTeam.toLowerCase().includes('japan') && m.awayTeam.toLowerCase().includes('netherland'))
+      (norm(m.homeTeam).includes('netherland') && norm(m.awayTeam).includes('japan')) ||
+      (norm(m.homeTeam).includes('japan') && norm(m.awayTeam).includes('netherland'))
     );
     if (nedJpnMatch) {
       nedJpnMatch.homeScore = 2;
@@ -569,10 +560,10 @@ async function fetchAndUpdate() {
 
   } catch(e) {
     console.error(e);
-    setStatus('error', 'API connection offline. Using saved local state.');
+    setStatus('error', `Offline Mode: Using cached tournament stats. (${e.message})`);
     
     document.getElementById('app').style.display = 'block';
-    document.getElementById('headerSub').textContent = 'Local Mode (Offline)';
+    document.getElementById('headerSub').textContent = 'Local Cache Mode';
     
     buildScoredPlayers();
     renderAll();
@@ -583,8 +574,6 @@ async function fetchAndUpdate() {
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
-function norm(s) { return (s||'').toLowerCase().trim(); }
-
 function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer) {
   const tn = norm(teamName);
   let score = 0;
