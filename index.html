@@ -125,7 +125,7 @@
   .score-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
   .expand-hint { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
 
-  /* TEAM DETAIL PANEL (inside card) */
+  /* TEAM DETAIL PANEL */
   .card-breakdown { display: none; border-top: 1px solid var(--border); }
   .card-breakdown.open { display: block; }
   .team-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); }
@@ -246,6 +246,9 @@
   .player-row { display: grid; grid-template-columns: 110px 1fr 28px; gap: 10px; margin-bottom: 16px; align-items: start; }
   .player-row label { font-size: 0.8rem; color: var(--muted); padding-top: 9px; font-weight: 500; }
   .team-inputs { display: flex; flex-direction: column; gap: 5px; }
+  
+  /* DROPDOWN SELECTOR SPECIFICS */
+  .input-wrapper { position: relative; width: 100%; }
   input[type="text"] {
     background: var(--surface); border: 1px solid var(--border); color: var(--text);
     border-radius: 6px; padding: 8px 12px; font-family: 'DM Sans', sans-serif;
@@ -253,6 +256,7 @@
   }
   input[type="text"]:focus { border-color: var(--accent); }
   input[type="text"]::placeholder { color: var(--muted); }
+  
   .add-player-btn {
     background: none; border: 1px dashed var(--border); color: var(--muted);
     border-radius: 6px; padding: 9px; font-family: 'DM Sans', sans-serif;
@@ -277,12 +281,58 @@
   .badge-live { background: rgba(232,64,64,0.2); color: #ef4444; border: 1px solid #ef4444; font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 700; animation: pulse 1.5s infinite; }
   .badge-ft { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.35); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
   .badge-up { background: rgba(122,139,168,0.12); color: var(--muted); border: 1px solid var(--border); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; }
-
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media(max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
+
+<datalist id="worldCupTeams">
+  <option value="Argentina"></option>
+  <option value="Australia"></option>
+  <option value="Austria"></option>
+  <option value="Belgium"></option>
+  <option value="Brazil"></option>
+  <option value="Cameroon"></option>
+  <option value="Canada"></option>
+  <option value="Chile"></option>
+  <option value="Colombia"></option>
+  <option value="Costa Rica"></option>
+  <option value="Croatia"></option>
+  <option value="Czechia"></option>
+  <option value="Denmark"></option>
+  <option value="Ecuador"></option>
+  <option value="Egypt"></option>
+  <option value="England"></option>
+  <option value="France"></option>
+  <option value="Germany"></option>
+  <option value="Ghana"></option>
+  <option value="Iran"></option>
+  <option value="Iraq"></option>
+  <option value="Italy"></option>
+  <option value="Jamaica"></option>
+  <option value="Japan"></option>
+  <option value="Mexico"></option>
+  <option value="Morocco"></option>
+  <option value="Netherlands"></option>
+  <option value="New Zealand"></option>
+  <option value="Nigeria"></option>
+  <option value="Panama"></option>
+  <option value="Peru"></option>
+  <option value="Poland"></option>
+  <option value="Portugal"></option>
+  <option value="Saudi Arabia"></option>
+  <option value="Senegal"></option>
+  <option value="South Africa"></option>
+  <option value="South Korea"></option>
+  <option value="Spain"></option>
+  <option value="Sweden"></option>
+  <option value="Switzerland"></option>
+  <option value="Tunisia"></option>
+  <option value="Ukraine"></option>
+  <option value="Uruguay"></option>
+  <option value="USA"></option>
+  <option value="Uzbekistan"></option>
+  <option value="Venezuela"></option>
+</datalist>
 
 <div class="setup-overlay" id="setupOverlay">
   <div class="setup-panel">
@@ -401,7 +451,11 @@ function addPlayerInput(name='', teams=['','','','','','']) {
       <div>
         <input type="text" placeholder="Player name" value="${name}" id="pname-${id}" style="margin-bottom:7px">
         <div class="team-inputs">
-          ${teams.map((t,i)=>`<input type="text" placeholder="Team ${i+1}" value="${t}" id="pt${i+1}-${id}">`).join('')}
+          ${teams.map((t,i)=>`
+            <div class="input-wrapper">
+              <input type="text" list="worldCupTeams" placeholder="Team ${i+1}" value="${t}" id="pt${i+1}-${id}">
+            </div>
+          `).join('')}
         </div>
       </div>
       ${id>1?`<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>`:'<div></div>'}
@@ -461,21 +515,18 @@ async function fetchAndUpdate() {
   icon.classList.add('spin');
 
   try {
-    // Queries a direct public proxy endpoint tracking the tournament competition matches
     const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://fixturedownload.com/feed/json/fifa-world-cup-2026'));
     if (!res.ok) throw new Error('Network error');
     
     const wrapper = await res.json();
     const rawMatches = JSON.parse(wrapper.contents);
 
-    // Normalize incoming public structural feeds to our exact application specification
     const convertedMatches = rawMatches.map(m => {
       let status = 'upcoming';
       if (m.HomeTeamScore !== null && m.AwayTeamScore !== null) {
-        status = 'FT'; // Matches completed automatically switch out of LIVE parameters
+        status = 'FT'; 
       }
       
-      // Inject rule context constraints manually identified from match telemetry
       let homeRed = 0, awayRed = 0;
       if (m.HomeTeam === 'Mexico') homeRed = 1;
       if (m.AwayTeam === 'South Africa') awayRed = 2;
@@ -493,7 +544,6 @@ async function fetchAndUpdate() {
       };
     });
 
-    // Handle custom state modifiers safely without breaking structures
     gameData = {
       lastUpdated: new Date().toISOString(),
       matches: convertedMatches,
@@ -506,7 +556,6 @@ async function fetchAndUpdate() {
       goldenBoot: null, goalOfTournament: null, youngPlayer: null
     };
 
-    // Override structural feed manually for the instant Japan vs Netherlands result change
     const nedJpnMatch = gameData.matches.find(m => 
       (m.homeTeam.toLowerCase().includes('netherland') && m.awayTeam.toLowerCase().includes('japan')) ||
       (m.homeTeam.toLowerCase().includes('japan') && m.awayTeam.toLowerCase().includes('netherland'))
@@ -698,7 +747,6 @@ function openTeamTab(e, playerIdx, teamIdx) {
   if (hint) hint.textContent = '▲ collapse';
 }
 
-// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function switchTeamTab(playerIdx, teamIdx) {
   const p = scoredPlayers[playerIdx];
   p.teamBreakdown.forEach((_,ti) => {
@@ -708,6 +756,7 @@ function switchTeamTab(playerIdx, teamIdx) {
   });
 }
 
+// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function renderUpcoming() {
   const { matches=[] } = gameData;
   const teamOwners = {};
