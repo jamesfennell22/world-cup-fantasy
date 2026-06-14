@@ -357,6 +357,28 @@ function switchTab(tab) {
 function addPlayerInput(name='', teams=['','','','','','']) {
   playerCount++;
   const id = playerCount;
+  
+  // List of all 48 qualified World Cup 2026 teams
+  const worldCupTeams = [
+    "Argentina", "Australia", "Austria", "Belgium", "Cameroon", "Canada", 
+    "Chile", "Colombia", "Costa Rica", "Croatia", "Czech Republic", "Denmark", 
+    "Ecuador", "Egypt", "England", "France", "Germany", "Ghana", "Iran", 
+    "Italy", "Ivory Coast", "Japan", "Mexico", "Morocco", "Netherlands", 
+    "New Zealand", "Nigeria", "Panama", "Peru", "Poland", "Portugal", 
+    "Qatar", "Saudi Arabia", "Scotland", "Senegal", "Serbia", "South Africa", 
+    "South Korea", "Spain", "Sweden", "Switzerland", "Tunisia", "Turkey", 
+    "Ukraine", "Uruguay", "USA", "Wales", "Zambia"
+  ];
+
+  // Generate dropdown options
+  const optionsHtml = (selectedTeam) => {
+    return `<option value="">-- Select a Team --</option>` + 
+      worldCupTeams.map(team => {
+        const isSelected = norm(team) === norm(selectedTeam) ? 'selected' : '';
+        return `<option value="${team}" ${isSelected}>${team}</option>`;
+      }).join('');
+  };
+
   const div = document.createElement('div');
   div.id = `prow-${id}`;
   div.innerHTML = `
@@ -365,14 +387,18 @@ function addPlayerInput(name='', teams=['','','','','','']) {
       <div>
         <input type="text" placeholder="Player name" value="${name}" id="pname-${id}" style="margin-bottom:7px">
         <div class="team-inputs">
-          ${teams.map((t,i)=>`<input type="text" placeholder="Team ${i+1}" value="${t}" id="pt${i+1}-${id}">`).join('')}
+          ${teams.map((t, i) => `
+            <select id="pt${i+1}-${id}" style="background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-family: 'DM Sans', sans-serif; font-size: 0.84rem; width: 100%; outline: none; margin-bottom: 3px;">
+              ${optionsHtml(t)}
+            </select>
+          `).join('')}
         </div>
       </div>
-      ${id>1?`<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>`:'<div></div>'}
+      ${id > 1 ? `<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>` : '<div></div>'}
     </div>`;
+    
   document.getElementById('playerInputs').appendChild(div);
 }
-
 function removePlayer(id) { document.getElementById(`prow-${id}`)?.remove(); }
 
 function startDashboard() {
@@ -384,7 +410,7 @@ function startDashboard() {
     if (!name) continue;
     const teams = [1,2,3,4,5,6].map(j => {
       const el = document.getElementById(`pt${j}-${i}`);
-      return el ? el.value.trim() : '';
+      return el ? el.value : ''; // Reads the selected dropdown option
     }).filter(Boolean);
     if (teams.length > 0) players.push({ name, teams });
   }
