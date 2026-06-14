@@ -110,7 +110,8 @@
   .rank.other { color: var(--muted); }
   .player-info { flex: 1; min-width: 0; }
   .player-name { font-weight: 600; font-size: 1rem; }
-  .team-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .player-stats-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; font-weight: 500; }
+  .team-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .chip {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 4px; padding: 2px 7px; font-size: 0.7rem;
@@ -316,6 +317,7 @@
   <option value="New Zealand"></option>
   <option value="Nigeria"></option>
   <option value="Panama"></option>
+  <option value="Paraguay"></option>
   <option value="Peru"></option>
   <option value="Poland"></option>
   <option value="Portugal"></option>
@@ -327,6 +329,7 @@
   <option value="Sweden"></option>
   <option value="Switzerland"></option>
   <option value="Tunisia"></option>
+  <option value="Turkey"></option>
   <option value="Ukraine"></option>
   <option value="Uruguay"></option>
   <option value="USA"></option>
@@ -413,7 +416,7 @@
 
   <div class="tab-panel" id="tab-boot">
     <div class="section-title">Golden Boot Race</div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Top 10 scorers — and which fantasy player owns their team.</p>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Top scorers — and which fantasy player owns their team.</p>
     <div id="bootContent">
       <div class="empty-state"><div class="big">👟</div>Loading...</div>
     </div>
@@ -550,8 +553,14 @@ async function fetchAndUpdate() {
       qualified: [],
       eliminated: [],
       goldenBootScorers: [
+        {"player": "Kylian Mbappé", "team": "France", "goals": 4},
+        {"player": "Vinícius Júnior", "team": "Brazil", "goals": 3},
         {"player": "Folarin Balogun", "team": "USA", "goals": 2},
-        {"player": "Raúl Jiménez", "team": "Mexico", "goals": 1}
+        {"player": "Harry Kane", "team": "England", "goals": 2},
+        {"player": "Lionel Messi", "team": "Argentina", "goals": 2},
+        {"player": "Raúl Jiménez", "team": "Mexico", "goals": 1},
+        {"player": "Arda Güler", "team": "Turkey", "goals": 1},
+        {"player": "Julio Enciso", "team": "Paraguay", "goals": 1}
       ],
       goldenBoot: null, goalOfTournament: null, youngPlayer: null
     };
@@ -569,7 +578,6 @@ async function fetchAndUpdate() {
     buildScoredPlayers();
     renderAll();
     
-    // Safety unblock: Ensure app workspace is always visible upon feed collection loop
     document.getElementById('app').style.display = 'block';
     
     const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
@@ -580,7 +588,6 @@ async function fetchAndUpdate() {
     console.error(e);
     setStatus('error', 'API connection offline. Using saved local state.');
     
-    // Safety layout unlock: Force dashboard visibility during live network drops
     document.getElementById('app').style.display = 'block';
     document.getElementById('headerSub').textContent = 'Local Mode (Offline)';
     
@@ -599,12 +606,15 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
   const tn = norm(teamName);
   let score = 0;
   const matchDetails = [];
+  let matchCount = 0;
 
   for (const m of (matches||[])) {
     if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) continue;
     const isHome = norm(m.homeTeam) === tn;
     const isAway = norm(m.awayTeam) === tn;
     if (!isHome && !isAway) continue;
+
+    matchCount++; // Increment completed game match counter
 
     const myScore = isHome ? m.homeScore : m.awayScore;
     const oppScore = isHome ? m.awayScore : m.homeScore;
@@ -640,21 +650,23 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
   if ((qualified||[]).some(q => norm(q) === tn)) { score += 0.5; bonuses.push('Qualified +0.5'); }
   if (norm(goldenBoot) === tn) { score += 1; bonuses.push('Golden Boot +1'); }
 
-  return { score, matchDetails, bonuses };
+  return { score, matchDetails, bonuses, matchCount };
 }
 
 function buildScoredPlayers() {
   const { matches=[], qualified=[], eliminated=[], goldenBoot, goalOfTournament, youngPlayer } = gameData;
   scoredPlayers = players.map(p => {
     let total = 0;
+    let totalMatchesPlayed = 0;
     const teamBreakdown = p.teams.map(t => {
-      const { score, matchDetails, bonuses } = calcTeamScore(t, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer);
+      const { score, matchDetails, bonuses, matchCount } = calcTeamScore(t, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer);
       total += score;
+      totalMatchesPlayed += matchCount;
       const isElim = eliminated.some(e => norm(e) === norm(t));
       const isQual = qualified.some(q => norm(q) === norm(t));
-      return { team: t, score, matchDetails, bonuses, isElim, isQual };
+      return { team: t, score, matchDetails, bonuses, isElim, isQual, matchCount };
     });
-    return { ...p, total, teamBreakdown };
+    return { ...p, total, teamBreakdown, totalMatchesPlayed };
   }).sort((a,b) => b.total - a.total);
 }
 
@@ -705,7 +717,7 @@ function renderLeaderboard() {
         <div class="team-detail-header">
           <div>
             <div class="team-detail-name">${t.team}</div>
-            <div style="font-size:0.72rem;color:var(--muted)">${t.matchDetails.length} match(es) cataloged</div>
+            <div style="font-size:0.72rem;color:var(--muted)">${t.matchDetails.length} match(es) completed</div>
           </div>
           <div class="team-detail-score">${totalStr > 0 ? '+' : ''}${totalStr} pts</div>
         </div>
@@ -722,6 +734,7 @@ function renderLeaderboard() {
         <div class="rank ${rankClass}">${rankSymbol}</div>
         <div class="player-info">
           <div class="player-name">${p.name}</div>
+          <div class="player-stats-meta">📊 Total matches played by teams: <strong>${p.totalMatchesPlayed}</strong></div>
           <div class="team-chips">${chips}</div>
         </div>
         <div class="score-display">
@@ -746,7 +759,6 @@ function toggleBreakdown(i) {
   if (hint) hint.textContent = el.classList.contains('open') ? '▲ collapse' : '▼ expand';
 }
 
-// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function openTeamTab(e, playerIdx, teamIdx) {
   e.stopPropagation();
   const bd = document.getElementById(`breakdown-${playerIdx}`);
@@ -760,11 +772,12 @@ function switchTeamTab(playerIdx, teamIdx) {
   const p = scoredPlayers[playerIdx];
   p.teamBreakdown.forEach((_,ti) => {
     document.getElementById(`ttab-${playerIdx}-${ti}`)?.classList.toggle('active', ti===teamIdx);
-    const panel = document.getElementById(`tpanel-${playerIdx}-${ti}`);
+    const panel = document.getElementById('tpanel-' + playerIdx + '-' + ti);
     if (panel) panel.style.display = ti===teamIdx ? 'block' : 'none';
   });
 }
 
+// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function renderUpcoming() {
   const { matches=[] } = gameData;
   const teamOwners = {};
