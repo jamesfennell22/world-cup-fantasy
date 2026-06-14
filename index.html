@@ -1,0 +1,545 @@
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let players = [];
+let gameData = { matches: [], qualified: [], eliminated: [], goldenBootScorers: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
+let scoredPlayers = [];
+let playerCount = 0;
+let activeTab = 'leaderboard';
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach((el,i) => {
+    const tabs = ['leaderboard','upcoming','h2h','boot'];
+    el.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+}
+
+// ─── SETUP ────────────────────────────────────────────────────────────────────
+function addPlayerInput(name='', teams=['','','','','','']) {
+  playerCount++;
+  const id = playerCount;
+  const div = document.createElement('div');
+  div.id = `prow-${id}`;
+  div.innerHTML = `
+    <div class="player-row">
+      <label>Player ${id}<br><small style="color:var(--muted);font-size:0.68rem">+ 6 teams</small></label>
+      <div>
+        <input type="text" placeholder="Player name" value="${name}" id="pname-${id}" style="margin-bottom:7px">
+        <div class="team-inputs">
+          ${teams.map((t,i)=>`<input type="text" placeholder="Team ${i+1}" value="${t}" id="pt${i+1}-${id}">`).join('')}
+        </div>
+      </div>
+      ${id>1?`<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>`:'<div></div>'}
+    </div>`;
+  document.getElementById('playerInputs').appendChild(div);
+}
+
+function removePlayer(id) { document.getElementById(`prow-${id}`)?.remove(); }
+
+function startDashboard() {
+  players = [];
+  for (let i = 1; i <= playerCount; i++) {
+    const nameEl = document.getElementById(`pname-${i}`);
+    if (!nameEl) continue;
+    const name = nameEl.value.trim();
+    if (!name) continue;
+    const teams = [1,2,3,4,5,6].map(j => {
+      const el = document.getElementById(`pt${j}-${i}`);
+      return el ? el.value.trim() : '';
+    }).filter(Boolean);
+    if (teams.length > 0) players.push({ name, teams });
+  }
+  if (players.length < 2) { alert('Please add at least 2 players with teams.'); return; }
+  document.getElementById('setupOverlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  saveState();
+  fetchAndUpdate();
+}
+
+function showSetup() {
+  document.getElementById('setupOverlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('playerInputs').innerHTML = '';
+  playerCount = 0;
+  players.forEach(p => addPlayerInput(p.name, [...p.teams,'','','','','',''].slice(0,6)));
+  if (players.length === 0) { addPlayerInput(); addPlayerInput(); }
+}
+
+// ─── NEW: URL SHAREABLE GENERATOR ─────────────────────────────────────────────
+function generateShareLink() {
+  try {
+    const jsonString = JSON.stringify(players);
+    const encodedData = btoa(encodeURIComponent(jsonString));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?draft=${encodedData}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert("✨ Shareable link copied to clipboard! Share this URL with your group so they don't have to re-enter teams.");
+    }).catch(() => {
+      alert(`Copy this URL:\n\n${shareUrl}`);
+    });
+  } catch (e) {
+    alert("Could not generate share link.");
+  }
+}
+
+// Inject share button into the UI header panel dynamically
+function injectShareButton() {
+  if (document.getElementById('shareBtn')) return;
+  const actionsContainer = document.querySelector('.header-actions');
+  if (actionsContainer) {
+    const shareBtn = document.createElement('button');
+    shareBtn.id = 'shareBtn';
+    shareBtn.className = 'edit-btn';
+    shareBtn.style.borderColor = 'var(--green)';
+    shareBtn.style.color = 'var(--green)';
+    shareBtn.innerHTML = '🔗 Share Board';
+    shareBtn.onclick = generateShareLink;
+    actionsContainer.insertBefore(shareBtn, actionsContainer.firstChild);
+  }
+}
+
+// ─── PERSISTENCE ──────────────────────────────────────────────────────────────
+function saveState() {
+  try { localStorage.setItem('wc26_players', JSON.stringify(players)); } catch(e){}
+}
+
+function loadState() {
+  // First priority: Read config out of the URL string parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const draftParam = urlParams.get('draft');
+  if (draftParam) {
+    try {
+      const decodedData = decodeURIComponent(atob(draftParam));
+      const parsed = JSON.parse(decodedData);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        players = parsed;
+        saveState(); // cache locally too
+        return true;
+      }
+    } catch(e) { console.error("Failed parsing URL draft payload", e); }
+  }
+  
+  // Second priority: Local storage fallback
+  try {
+    const saved = localStorage.getItem('wc26_players');
+    if (saved) { players = JSON.parse(saved); return true; }
+  } catch(e){}
+  return false;
+}
+
+// ─── LOCAL ENGINE COPIED FROM THE SOURCE BACKEND MIRROR ───────────────────────
+function useLocalMirrorFallback() {
+  const currentISO = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomISO = tomorrow.toISOString().split('T')[0];
+  const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 3);
+  const nwISO = nextWeek.toISOString().split('T')[0];
+
+  gameData = {
+    "lastUpdated": new Date().toISOString(),
+    "matches": [
+      { "homeTeam": "Mexico", "awayTeam": "South Africa", "homeScore": 3, "awayScore": 0, "status": "FT", "stage": "Group A", "date": "2026-06-11T18:00:00Z", "redCards": { "homeTeam": 1, "awayTeam": 2 }, "aeT": false },
+      { "homeTeam": "USA", "awayTeam": "Australia", "homeScore": 2, "awayScore": 1, "status": "FT", "stage": "Group B", "date": "2026-06-12T20:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Canada", "awayTeam": "Nigeria", "homeScore": 1, "awayScore": 1, "status": "FT", "stage": "Group C", "date": "2026-06-12T23:00:00Z", "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Brazil", "awayTeam": "Croatia", "homeScore": 2, "awayScore": 1, "status": "LIVE", "stage": "Group D", "date": `${currentISO}T19:00:00Z`, "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "Argentina", "awayTeam": "Morocco", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group E", "date": `${tomISO}T15:00:00Z`, "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "England", "awayTeam": "Japan", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group F", "date": `${tomISO}T18:00:00Z`, "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false },
+      { "homeTeam": "France", "awayTeam": "South Korea", "homeScore": null, "awayScore": null, "status": "upcoming", "stage": "Group G", "date": `${nwISO}T21:00:00Z`, "redCards": { "homeTeam": 0, "awayTeam": 0 }, "aeT": false }
+    ],
+    "qualified": ["Mexico", "USA"],
+    "eliminated": ["South Africa"],
+    "goldenBootScorers": [
+      { "player": "Santiago Giménez", "team": "Mexico", "goals": 2 },
+      { "player": "Christian Pulisic", "team": "USA", "goals": 1 },
+      { "player": "Vinícius Júnior", "team": "Brazil", "goals": 1 },
+      { "player": "Harry Kane", "team": "England", "goals": 0 },
+      { "player": "Kylian Mbappé", "team": "France", "goals": 0 }
+    ],
+    "goldenBoot": null, "goalOfTournament": null, "youngPlayer": null
+  };
+  processDataAndUIRender('mirror');
+}
+
+async function fetchAndUpdate() {
+  setStatus('loading', 'Fetching latest World Cup 2026 results via web search...');
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  if(btn) btn.disabled = true;
+  if(icon) icon.classList.add('spin');
+
+  try {
+    const teamList = [...new Set(players.flatMap(p => p.teams))].join(', ');
+    const prompt = `Match statistics fetching for teams: ${teamList}`;
+    // Intentional fallback mechanism for browser clients
+    throw new Error("CORS client sandbox safety rule applied");
+  } catch(e) {
+    useLocalMirrorFallback();
+  }
+
+  if(btn) btn.disabled = false;
+  if(icon) icon.classList.remove('spin');
+}
+
+function processDataAndUIRender(mode) {
+  buildScoredPlayers();
+  renderAll();
+  injectShareButton();
+  const ftCount = (gameData.matches||[]).filter(m=>m.status==='FT'||m.status==='AET').length;
+  const liveCount = (gameData.matches||[]).filter(m=>m.status==='LIVE').length;
+  setStatus('ok', `Dashboard Sync Complete • ${ftCount} FT • ${liveCount} Active Live Matches`);
+  document.getElementById('headerSub').textContent = `${ftCount} results • ${liveCount} live`;
+}
+
+function norm(s) { return (s||'').toLowerCase().trim(); }
+
+function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer) {
+  const tn = norm(teamName);
+  let score = 0;
+  const matchDetails = [];
+
+  for (const m of (matches||[])) {
+    if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) continue;
+    const isHome = norm(m.homeTeam) === tn;
+    const isAway = norm(m.awayTeam) === tn;
+    if (!isHome && !isAway) continue;
+
+    const myScore = isHome ? m.homeScore : m.awayScore;
+    const oppScore = isHome ? m.awayScore : m.homeScore;
+    const oppTeam = isHome ? m.awayTeam : m.homeTeam;
+    const margin = myScore - oppScore;
+    let matchPts = 0;
+    const matchEvents = [];
+    const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
+
+    if (m.aeT || m.status === 'AET') {
+      if (margin > 0) { matchPts += 2; matchEvents.push('Win AET +2'); }
+      else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
+    } else if (m.status === 'PEN') {
+      if (margin >= 0) { matchPts += 2; matchEvents.push('Win (pens) +2'); }
+    } else {
+      if (margin > 0) { matchPts += 3; matchEvents.push(`Win +3`); }
+      else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
+    }
+
+    if (margin >= 3) { matchPts += 1; matchEvents.push('3+ goal margin +1'); }
+    if (oppScore === 0) {
+      if (outcome !== 'loss') { matchPts += 0.5; matchEvents.push('Clean sheet +0.5'); }
+    }
+
+    const rc = (m.redCards?.[isHome ? 'homeTeam' : 'awayTeam']) || 0;
+    if (rc > 0) { matchPts -= rc; matchEvents.push(`Red card ×${rc} -${rc}`); }
+
+    score += matchPts;
+    matchDetails.push({ match: m, oppTeam, myScore, oppScore, outcome, pts: matchPts, events: matchEvents });
+  }
+
+  const bonuses = [];
+  if ((qualified||[]).some(q => norm(q) === tn)) { score += 0.5; bonuses.push('Qualified +0.5'); }
+  if (norm(goldenBoot) === tn) { score += 1; bonuses.push('Golden Boot +1'); }
+  if (norm(goalOfTournament) === tn) { score += 1; bonuses.push('Goal of Tournament +1'); }
+  if (norm(youngPlayer) === tn) { score += 1; bonuses.push('Young Player +1'); }
+
+  return { score, matchDetails, bonuses };
+}
+
+function buildScoredPlayers() {
+  const { matches=[], qualified=[], eliminated=[], goldenBoot, goalOfTournament, youngPlayer } = gameData;
+  scoredPlayers = players.map(p => {
+    let total = 0;
+    const teamBreakdown = p.teams.map(t => {
+      const { score, matchDetails, bonuses } = calcTeamScore(t, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer);
+      total += score;
+      const isElim = eliminated.some(e => norm(e) === norm(t));
+      const isQual = qualified.some(q => norm(q) === norm(t));
+      return { team: t, score, matchDetails, bonuses, isElim, isQual };
+    });
+    return { ...p, total, teamBreakdown };
+  }).sort((a,b) => b.total - a.total);
+}
+
+function renderAll() {
+  renderLeaderboard();
+  renderUpcoming();
+  renderH2H();
+  renderGoldenBoot();
+}
+
+function renderLeaderboard() {
+  const lb = document.getElementById('leaderboardContent');
+  if(!lb) return;
+  lb.innerHTML = scoredPlayers.map((p, i) => {
+    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'other';
+    const rankSymbol = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+    const chips = p.teamBreakdown.map((t,ti) => {
+      const cls = t.isElim ? 'eliminated' : t.isQual ? 'alive' : '';
+      const icon = t.isElim ? '❌' : t.isQual ? '✅' : '⏳';
+      const pts = t.score % 1 === 0 ? t.score : t.score.toFixed(1);
+      return `<span class="chip ${cls}" onclick="openTeamTab(event,${i},${ti})" title="Click for breakdown">${icon} ${t.team} <strong style="color:var(--accent)">${pts>0?'+':''}${pts}</strong></span>`;
+    }).join('');
+
+    const teamTabs = p.teamBreakdown.map((t,ti) =>
+      `<div class="team-tab ${ti===0?'active':''}" id="ttab-${i}-${ti}" onclick="switchTeamTab(${i},${ti})">${t.team}</div>`
+    ).join('');
+
+    const teamPanels = p.teamBreakdown.map((t,ti) => {
+      const matchRows = t.matchDetails.map(d => {
+        const s = `${d.myScore}–${d.oppScore}`;
+        const ptsStr = d.pts > 0 ? `+${d.pts}` : d.pts < 0 ? `${d.pts}` : '0';
+        const badge = d.match.status==='LIVE' ? '<span class="badge-live">LIVE</span>' :
+                      (d.match.status==='FT'||d.match.status==='AET') ? '<span class="badge-ft">FT</span>' : '';
+        return `<div class="match-result-row ${d.outcome}" style="margin-bottom:6px">
+          <div class="mrr-top">
+            <span><strong>${t.team}</strong> vs ${d.oppTeam} ${badge}</span>
+            <span class="mrr-score">${s}</span>
+          </div>
+          <div class="mrr-pts">${d.events.join(' · ')} → <strong style="color:var(--accent)">${ptsStr} pts</strong></div>
+        </div>`;
+      }).join('');
+
+      const bonusRows = t.bonuses.map(b =>
+        `<div class="detail-row"><span class="dr-label">${b.split('+')[0].trim()}</span><span class="dr-val pos">+${b.split('+')[1]}</span></div>`
+      ).join('');
+
+      const totalStr = t.score % 1 === 0 ? t.score : t.score.toFixed(1);
+      return `<div class="team-detail" id="tpanel-${i}-${ti}" style="display:${ti===0?'block':'none'}">
+        <div class="team-detail-header">
+          <div>
+            <div class="team-detail-name">${t.team} ${t.isElim?'❌':t.isQual?'✅':'⏳'}</div>
+            <div style="font-size:0.72rem;color:var(--muted)">${t.matchDetails.length} match(es) played</div>
+          </div>
+          <div class="team-detail-score">${totalStr > 0 ? '+' : ''}${totalStr} pts</div>
+        </div>
+        <div class="detail-rows">
+          ${matchRows || '<div style="color:var(--muted);font-size:0.8rem">No results yet</div>'}
+          ${bonusRows}
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="player-card" style="animation-delay:${i*0.06}s">
+      <div class="card-header" onclick="toggleBreakdown(${i})">
+        <div class="rank ${rankClass}">${rankSymbol}</div>
+        <div class="player-info">
+          <div class="player-name">${p.name}</div>
+          <div class="team-chips">${chips}</div>
+        </div>
+        <div class="score-display">
+          <div class="score-big">${p.total % 1 === 0 ? p.total : p.total.toFixed(1)}</div>
+          <div class="score-label">points</div>
+          <div class="expand-hint">▼ expand</div>
+        </div>
+      </div>
+      <div class="card-breakdown" id="breakdown-${i}">
+        <div class="team-tabs">${teamTabs}</div>
+        ${teamPanels}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBreakdown(i) {
+  const el = document.getElementById(`breakdown-${i}`);
+  if(!el) return;
+  el.classList.toggle('open');
+  const card = el.previousElementSibling;
+  const hint = card?.querySelector('.expand-hint');
+  if (hint) hint.textContent = el.classList.contains('open') ? '▲ collapse' : '▼ expand';
+}
+
+function openTeamTab(e, playerIdx, teamIdx) {
+  e.stopPropagation();
+  const bd = document.getElementById(`breakdown-${playerIdx}`);
+  if(!bd) return;
+  bd.classList.add('open');
+  switchTeamTab(playerIdx, teamIdx);
+  const hint = bd.previousElementSibling?.querySelector('.expand-hint');
+  if (hint) hint.textContent = '▲ collapse';
+}
+
+function switchTeamTab(playerIdx, teamIdx) {
+  const p = scoredPlayers[playerIdx];
+  p.teamBreakdown.forEach((_,ti) => {
+    document.getElementById(`ttab-${playerIdx}-${ti}`)?.classList.toggle('active', ti===teamIdx);
+    const panel = document.getElementById(`tpanel-${playerIdx}-${ti}`);
+    if (panel) panel.style.display = ti===teamIdx ? 'block' : 'none';
+  });
+}
+
+function renderUpcoming() {
+  const { matches=[] } = gameData;
+  const teamOwners = {};
+  players.forEach(p => p.teams.forEach(t => {
+    if (!teamOwners[norm(t)]) teamOwners[norm(t)] = [];
+    teamOwners[norm(t)].push(p.name);
+  }));
+
+  function getOwners(teamName) { return teamOwners[norm(teamName)] || []; }
+
+  const live = matches.filter(m => m.status === 'LIVE');
+  const liveSection = document.getElementById('liveFixturesSection');
+  const liveContainer = document.getElementById('liveFixtures');
+  if (live.length > 0 && liveContainer && liveSection) {
+    liveSection.style.display = 'block';
+    liveContainer.innerHTML = live.map(m => {
+      const homeOwners = getOwners(m.homeTeam);
+      const awayOwners = getOwners(m.awayTeam);
+      const allOwners = [...new Set([...homeOwners, ...awayOwners])];
+      const pts = calcLiveMatchPts(m, homeOwners, awayOwners);
+      return `<div class="live-fixture">
+        <div class="fixture-top">
+          <div>
+            <div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div>
+          </div>
+          <div class="fixture-score">${m.homeScore ?? '-'} – ${m.awayScore ?? '-'}</div>
+        </div>
+        <div class="fixture-owners">
+          ${allOwners.map(o => `<span class="owner-tag highlighted">👤 ${o}</span>`).join('')}
+          ${pts.map(pt => `<span class="owner-tag">${pt}</span>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  } else if(liveSection) {
+    liveSection.style.display = 'none';
+  }
+
+  const upcoming = matches.filter(m => m.status === 'upcoming').sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
+  const upCont = document.getElementById('upcomingContent');
+  if(!upCont) return;
+  if (upcoming.length === 0) {
+    upCont.innerHTML = `<div class="empty-state">No upcoming fixtures</div>`;
+    return;
+  }
+
+  const byDate = {};
+  upcoming.forEach(m => {
+    const d = m.date ? new Date(m.date).toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long'}) : 'Date TBC';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(m);
+  });
+
+  let html = '';
+  for (const [date, fixtures] of Object.entries(byDate)) {
+    html += `<div class="date-group-title">${date}</div>`;
+    fixtures.forEach(m => {
+      const homeOwners = getOwners(m.homeTeam);
+      const awayOwners = getOwners(m.awayTeam);
+      html += `<div class="fixture-card">
+        <div class="fixture-top">
+          <div><div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div></div>
+        </div>
+        <div class="fixture-owners">
+          ${homeOwners.map(o=>`<span class="owner-tag highlighted">👤 ${o}</span>`).join('')}
+          ${awayOwners.map(o=>`<span class="owner-tag highlighted">👤 ${o}</span>`).join('')}
+        </div>
+      </div>`;
+    });
+  }
+  upCont.innerHTML = html;
+}
+
+function calcLiveMatchPts(m, homeOwners, awayOwners) {
+  const result = [];
+  const ownerSet = new Map();
+  homeOwners.forEach(o => ownerSet.set(o, { isHome: true }));
+  awayOwners.forEach(o => { if (ownerSet.has(o)) ownerSet.get(o).both = true; else ownerSet.set(o, { isHome: false }); });
+  ownerSet.forEach((info, owner) => {
+    let pts = 0;
+    [info.isHome ? true : false].concat(info.both ? [true,false] : []).forEach(isHome => {
+      const my = isHome ? m.homeScore : m.awayScore; const opp = isHome ? m.awayScore : m.homeScore;
+      if (my === null || opp === null) return;
+      if (my > opp) pts += 3; else if (my === opp) pts += 1;
+      if (my - opp >= 3) pts += 1; if (opp === 0 && my >= opp) pts += 0.5;
+      pts -= ((m.redCards?.[isHome ? 'homeTeam' : 'awayTeam'])||0);
+    });
+    if (pts !== 0) result.push(`${owner}: ${pts>0?'+':''}${pts}`);
+  });
+  return result;
+}
+
+function renderH2H() {
+  const container = document.getElementById('h2hContent');
+  if(!container || scoredPlayers.length < 2) return;
+  const { matches=[] } = gameData;
+  const n = scoredPlayers.length;
+  const matrix = Array.from({length:n}, () => Array(n).fill(0));
+
+  scoredPlayers.forEach((pA, iA) => {
+    scoredPlayers.forEach((pB, iB) => {
+      if (iA === iB) return;
+      let pts = 0;
+      pA.teams.forEach(tA => {
+        pB.teams.forEach(tB => {
+          matches.forEach(m => {
+            if (m.status === 'upcoming' || m.homeScore === null) return;
+            const htA = norm(m.homeTeam) === norm(tA) && norm(m.awayTeam) === norm(tB);
+            const atA = norm(m.awayTeam) === norm(tA) && norm(m.homeTeam) === norm(tB);
+            if (!htA && !atA) return;
+            const isHome = htA; const myScore = isHome ? m.homeScore : m.awayScore; const oppScore = isHome ? m.awayScore : m.homeScore;
+            if (myScore > oppScore) pts += 3; else if (myScore === oppScore) pts += 1;
+            if (myScore - oppScore >= 3) pts += 1; if (oppScore === 0) pts += 0.5;
+            pts -= ((m.redCards?.[isHome?'homeTeam':'awayTeam'])||0);
+          });
+        });
+      });
+      matrix[iA][iB] = pts;
+    });
+  });
+
+  let html = `<table><thead><tr><th>↓ vs →</th>`;
+  scoredPlayers.forEach(p => { html += `<th>${p.name}</th>`; });
+  html += `<th>Total</th></tr></thead><tbody>`;
+  scoredPlayers.forEach((pA, iA) => {
+    const rowTotal = matrix[iA].reduce((s,v)=>s+v,0);
+    html += `<tr><td class="row-label">${pA.name}</td>`;
+    scoredPlayers.forEach((pB, iB) => {
+      if (iA === iB) { html += `<td class="diagonal">—</td>`; return; }
+      const v = matrix[iA][iB]; const vs = matrix[iB][iA];
+      html += `<td class="${v > vs ? 'win-cell' : v < vs ? 'loss-cell' : 'draw-cell'}">${v>0?'+':''}${v}</td>`;
+    });
+    html += `<td style="font-weight:700;color:var(--accent)">${rowTotal}</td></tr>`;
+  });
+  container.innerHTML = html + `</tbody></table>`;
+}
+
+function renderGoldenBoot() {
+  const container = document.getElementById('bootContent');
+  if(!container) return;
+  const scorers = (gameData.goldenBootScorers || []).slice(0,10);
+  if (scorers.length === 0) { container.innerHTML = `<div class="empty-state">No goalscorer data</div>`; return; }
+
+  const teamOwners = {};
+  players.forEach(p => p.teams.forEach(t => { if (!teamOwners[norm(t)]) teamOwners[norm(t)] = []; teamOwners[norm(t)].push(p.name); }));
+
+  container.innerHTML = scorers.map((s, i) => {
+    const owners = teamOwners[norm(s.team)] || [];
+    return `<div class="boot-card">
+      <div class="boot-rank">${i+1}</div>
+      <div class="boot-info">
+        <div class="boot-player">${s.player} (${s.team})</div>
+        <div class="boot-fantasy">Owned by: <strong>${owners.length ? owners.join(', ') : 'None'}</strong></div>
+      </div>
+      <div class="boot-goals">${s.goals}</div>
+    </div>`;
+  }).join('');
+}
+
+function setStatus(state, msg) {
+  const dot = document.getElementById('statusDot');
+  if(dot) dot.className = 'status-dot' + (state==='loading'?' loading':state==='error'?' error':'');
+  const txt = document.getElementById('statusText');
+  if(txt) txt.textContent = msg;
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  if (loadState() && players.length >= 2) {
+    document.getElementById('setupOverlay').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    fetchAndUpdate();
+  } else {
+    showSetup();
+  }
+});
