@@ -452,7 +452,7 @@ function loadState() {
   return false;
 }
 
-// ─── AUTOMATED LIVE CORONER DATA FEED ─────────────────────────────────────────
+// ─── AUTOMATED LIVE PROXY FEED ────────────────────────────────────────────────
 async function fetchAndUpdate() {
   setStatus('loading', 'Fetching latest match matrices across data servers...');
   const btn = document.getElementById('refreshBtn');
@@ -461,7 +461,7 @@ async function fetchAndUpdate() {
   icon.classList.add('spin');
 
   try {
-    // Queries a direct public proxy endpoint tracking the competition matches
+    // Queries a direct public proxy endpoint tracking the tournament competition matches
     const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://fixturedownload.com/feed/json/fifa-world-cup-2026'));
     if (!res.ok) throw new Error('Network error');
     
@@ -493,7 +493,7 @@ async function fetchAndUpdate() {
       };
     });
 
-    // Hardcode custom state modifiers safely without breaking structures
+    // Handle custom state modifiers safely without breaking structures
     gameData = {
       lastUpdated: new Date().toISOString(),
       matches: convertedMatches,
@@ -526,7 +526,7 @@ async function fetchAndUpdate() {
 
   } catch(e) {
     console.error(e);
-    setStatus('error', 'API delay. Click Refresh to establish connection again.');
+    setStatus('error', 'API connection offline. Using saved state.');
     buildScoredPlayers();
     renderAll();
   }
@@ -724,7 +724,6 @@ function renderUpcoming() {
   if (live.length > 0) {
     liveSection.style.display = 'block';
     liveContainer.innerHTML = live.map(m => {
-      const allOwners = [...new Set([...getOwners(m.homeTeam), ...getOwners(m.awayTeam)])];
       return `<div class="live-fixture">
         <div class="fixture-top">
           <div><div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div></div>
