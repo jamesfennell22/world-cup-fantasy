@@ -878,7 +878,7 @@ function renderH2H() {
   scoredPlayers.forEach(p1 => {
     matrix[p1.name] = {};
     scoredPlayers.forEach(p2 => {
-      matrix[p1.name][p2.name] = { wins: 0, losses: 0, draws: 0, points: 0 };
+      matrix[p1.name][p2.name] = { points: 0, wins: 0, losses: 0 };
     });
   });
 
@@ -906,7 +906,7 @@ function renderH2H() {
         } else if (m.homeScore < m.awayScore) {
           selfPlayPoints[pRow.name] += 3; 
         } else {
-          selfPlayPoints[pRow.name] += 2; // 1 point to each team = 2 total
+          selfPlayPoints[pRow.name] += 2; 
         }
       }
     });
@@ -927,23 +927,20 @@ function renderH2H() {
         const colHasHome = colNormTeams.includes(hTeam);
         const colHasAway = colNormTeams.includes(aTeam);
 
-        // Skip if either player owns BOTH teams (handled by internal tracking loop above)
         if (rowHasHome && rowHasAway) return;
         if (colHasHome && colHasAway) return;
 
-        // Verify direct match between a team owned by pRow and a team owned by pCol
         if ((rowHasHome && colHasAway) || (rowHasAway && colHasHome)) {
           const rowIsHome = rowHasHome;
           const rowScore = rowIsHome ? m.homeScore : m.awayScore;
           const colScore = rowIsHome ? m.awayScore : m.homeScore;
 
           if (rowScore > colScore) {
-            matrix[pRow.name][pCol.name].wins++;
             matrix[pRow.name][pCol.name].points += 3;
+            matrix[pRow.name][pCol.name].wins++;
           } else if (rowScore < colScore) {
             matrix[pRow.name][pCol.name].losses++;
           } else {
-            matrix[pRow.name][pCol.name].draws++;
             matrix[pRow.name][pCol.name].points += 1;
           }
         }
@@ -962,21 +959,15 @@ function renderH2H() {
     html += `<tr><td class="row-label">${pRow.name}</td>`;
     scoredPlayers.forEach(pCol => {
       if (pRow.name === pCol.name) {
-        // Blends smoothly into the table grid with identical default cell formatting
         const selfPts = selfPlayPoints[pRow.name];
-        html += `<td class="draw-cell">
-          <strong>${selfPts} pts</strong>
-        </td>`;
+        html += `<td class="draw-cell"><strong>${selfPts} pts</strong></td>`;
       } else {
         const cell = matrix[pRow.name][pCol.name];
         let cellClass = 'draw-cell';
         if (cell.wins > cell.losses) cellClass = 'win-cell';
         if (cell.losses > cell.wins) cellClass = 'loss-cell';
 
-        html += `<td class="${cellClass}">
-          <strong>${cell.points} pts</strong><br>
-          <small style="font-size:0.68rem;color:var(--muted)">${cell.wins}W-${cell.draws}D-${cell.losses}L</small>
-        </td>`;
+        html += `<td class="${cellClass}"><strong>${cell.points} pts</strong></td>`;
       }
     });
     html += `</tr>`;
