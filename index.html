@@ -517,7 +517,7 @@ function setStatus(type, text) {
   txt.textContent = text;
 }
 
-// ─── AUTOMATED LIVE COR-FREE API DATA STREAM ─────────────────────────────────
+// ─── AUTOMATED LIVE HIGH-AVAILABILITY DATA STREAM ────────────────────────────
 async function fetchAndUpdate() {
   setStatus('loading', 'Streaming tournament matches directly from live feed...');
   const btn = document.getElementById('refreshBtn');
@@ -528,7 +528,8 @@ async function fetchAndUpdate() {
   }
 
   const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
-  const liveProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+  // Swapped to high-capacity CorsProxy infrastructure
+  const liveProxy = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
 
   let rawMatches = null;
   let errorMsg = '';
@@ -537,10 +538,8 @@ async function fetchAndUpdate() {
     const res = await fetch(liveProxy);
     if (!res.ok) throw new Error(`HTTP network response code: ${res.status}`);
     
-    const wrapper = await res.json();
-    if (wrapper && wrapper.contents) {
-      rawMatches = typeof wrapper.contents === 'string' ? JSON.parse(wrapper.contents) : wrapper.contents;
-    }
+    // CorsProxy returns the raw JSON text cleanly from the target stream directly
+    rawMatches = await res.json();
   } catch (e) {
     errorMsg = e.message;
   }
@@ -742,7 +741,6 @@ function openTeamTab(event, pIdx, tIdx) {
   }
 }
 
-// Ensure layout functions map index targets cleanly across rendering
 function switchTeamTab(pIdx, tIdx) {
   const card = document.getElementById(`breakdown-${pIdx}`);
   if (!card) return;
@@ -906,7 +904,6 @@ function renderUpcoming() {
   upcomingContent.innerHTML = html;
 }
 
-// ─── LEADERBOARD-CONSISTENT HEAD TO HEAD MATRIX ENGINE ───────────────────────
 function renderH2H() {
   const content = document.getElementById('h2hContent');
   if (!content) return;
@@ -1000,7 +997,7 @@ window.addEventListener('load', () => {
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     fetchAndUpdate();
-    setInterval(fetchAndUpdate, 300000); // Continuous data syncing layer
+    setInterval(fetchAndUpdate, 300000); 
   } else {
     addPlayerInput(); 
     addPlayerInput();
