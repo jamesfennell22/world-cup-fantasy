@@ -519,7 +519,7 @@ function setStatus(type, text) {
 
 // ─── AUTOMATED API SYNC ───────────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Connecting to tournament data streams via secure proxy...');
+  setStatus('loading', 'Connecting to tournament data streams...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn && icon) {
@@ -527,10 +527,11 @@ async function fetchAndUpdate() {
     icon.classList.add('spin');
   }
 
+  // Primary URL using a modern cross-origin optimized mirror endpoint
   const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
   const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
   ];
 
   let rawMatches = null;
@@ -541,7 +542,8 @@ async function fetchAndUpdate() {
       const res = await fetch(proxy);
       if (!res.ok) continue;
       const data = await res.json();
-      rawMatches = typeof data.contents === 'string' ? JSON.parse(data.contents) : data;
+      // CodeTabs returns the raw JSON string/array directly
+      rawMatches = typeof data === 'string' ? JSON.parse(data) : data;
       if (rawMatches && Array.isArray(rawMatches)) break;
     } catch (e) {
       errorMsg = e.message;
@@ -612,7 +614,7 @@ async function fetchAndUpdate() {
       setStatus('error', `Data parsing failure: ${err.message}`);
     }
   } else {
-    setStatus('error', `Offline Mode: Server request blocked or timed out. (${errorMsg || 'CORS Restriction'})`);
+    setStatus('error', `Offline Mode: Feed servers busy. (${errorMsg || 'CORS Restricting'})`);
     document.getElementById('app').style.display = 'block';
     document.getElementById('headerSub').textContent = 'Local Cache Mode';
     
