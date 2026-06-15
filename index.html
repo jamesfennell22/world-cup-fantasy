@@ -528,7 +528,6 @@ async function fetchAndUpdate() {
   }
 
   const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
-  // Swapped to high-capacity CorsProxy infrastructure
   const liveProxy = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
 
   let rawMatches = null;
@@ -537,8 +536,6 @@ async function fetchAndUpdate() {
   try {
     const res = await fetch(liveProxy);
     if (!res.ok) throw new Error(`HTTP network response code: ${res.status}`);
-    
-    // CorsProxy returns the raw JSON text cleanly from the target stream directly
     rawMatches = await res.json();
   } catch (e) {
     errorMsg = e.message;
@@ -551,14 +548,25 @@ async function fetchAndUpdate() {
         let homeS = m.HomeTeamScore;
         let awayS = m.AwayTeamScore;
 
+        // Force a valid string or numeric payload cleanup
+        if (homeS !== null && homeS !== undefined && homeS !== '') homeS = parseInt(homeS, 10);
+        if (awayS !== null && awayS !== undefined && awayS !== '') awayS = parseInt(awayS, 10);
+
+        // Standard feed mapping condition logic:
+        if (homeS !== null && !isNaN(homeS) && awayS !== null && !isNaN(awayS)) {
+          // If the feed explicitly labels the item as active/live or hasn't settled, preserve LIVE
+          if (m.Time === 'Live' || m.Status === 'Live' || m.Live === true) {
+            status = 'LIVE';
+          } else {
+            status = 'FT';
+          }
+        }
+
+        // Keep testing override for verification
         if (norm(m.HomeTeam).includes('belgium') && norm(m.AwayTeam).includes('egypt')) {
           status = 'LIVE';
           homeS = 0;
           awayS = 1;
-        }
-
-        if (status !== 'LIVE' && homeS !== null && awayS !== null) {
-          status = 'FT'; 
         }
         
         let homeRed = 0, awayRed = 0;
@@ -624,7 +632,7 @@ async function fetchAndUpdate() {
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
 function getMatchPointsForTeam(teamName, match) {
-  if (match.status === 'upcoming' || match.homeScore === null || match.awayScore === null) return 0;
+  if (match.status === 'upcoming' || match.homeScore === null || match.awayScore === null || isNaN(match.homeScore) || isNaN(match.awayScore)) return 0;
   
   const tn = norm(teamName);
   const isHome = norm(match.homeTeam) === tn;
@@ -665,7 +673,7 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
   let matchCount = 0;
 
   for (const m of (matches||[])) {
-    if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) continue;
+    if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null || isNaN(m.homeScore) || isNaN(m.awayScore)) continue;
     const isHome = norm(m.homeTeam) === tn;
     const isAway = norm(m.awayTeam) === tn;
     if (!isHome && !isAway) continue;
@@ -741,6 +749,7 @@ function openTeamTab(event, pIdx, tIdx) {
   }
 }
 
+// Complete the active team tab switcher cleanly
 function switchTeamTab(pIdx, tIdx) {
   const card = document.getElementById(`breakdown-${pIdx}`);
   if (!card) return;
@@ -928,7 +937,7 @@ function renderH2H() {
     const rowNormTeams = pRow.teams.map(t => norm(t));
 
     gameData.matches.forEach(m => {
-      if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) return;
+      if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null || isNaN(m.homeScore) || isNaN(m.awayScore)) return;
 
       const hTeam = norm(m.homeTeam);
       const aTeam = norm(m.awayTeam);
@@ -947,7 +956,7 @@ function renderH2H() {
       const colNormTeams = pCol.teams.map(t => norm(t));
 
       gameData.matches.forEach(m => {
-        if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) return;
+        if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null || isNaN(m.homeScore) || isNaN(m.awayScore)) return;
 
         const hTeam = norm(m.homeTeam);
         const aTeam = norm(m.awayTeam);
