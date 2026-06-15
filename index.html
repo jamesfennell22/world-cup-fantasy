@@ -505,6 +505,7 @@ function loadState() {
 function norm(s) { 
   let t = (s||'').toLowerCase().trim();
   if (t === "côte d'ivoire") return "ivory coast";
+  if (t === "turkey" || t === "türkiye") return "turkey"; // <-- Add this line
   return t;
 }
 
