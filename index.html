@@ -24,500 +24,333 @@
   body {
     background: var(--bg); color: var(--text);
     font-family: 'DM Sans', sans-serif; min-height: 100vh;
-    background-image: radial-gradient(ellipse at 20% 0%, rgba(245,166,35,0.08) 0%, transparent 60%),
-                      radial-gradient(ellipse at 80% 100%, rgba(232,64,64,0.06) 0%, transparent 60%);
+    background-image: radial-gradient(ellipse at 20% 0%, rgba(245,166,35,0.05) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(232,64,64,0.05) 0%, transparent 50%);
   }
-
-  /* HEADER */
   header {
-    padding: 20px 28px 0; border-bottom: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 0;
+    background: var(--surface); padding: 2rem 1rem; text-align: center;
+    border-bottom: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.3);
   }
-  .header-top {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 16px; flex-wrap: wrap; padding-bottom: 16px;
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: 3.5rem; letter-spacing: 2px; color: #fff; margin-bottom: 0.25rem; }
+  header p { font-size: 0.95rem; color: var(--muted); font-weight: 400; }
+  .status-badge {
+    display: inline-flex; align-items: center; margin-top: 1rem; padding: 0.4rem 0.8rem;
+    border-radius: 20px; font-size: 0.8rem; font-weight: 500; background: rgba(255,255,255,0.05);
   }
-  .header-left { display: flex; align-items: center; gap: 12px; }
-  .trophy-icon { font-size: 2rem; }
-  header h1 {
-    font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 3px;
-    background: linear-gradient(135deg, var(--accent), #fff 60%, var(--accent));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1;
-  }
-  header p { color: var(--muted); font-size: 0.78rem; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; }
-  .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .refresh-btn {
-    background: var(--accent); color: #000; border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
-    padding: 8px 16px; border-radius: 6px; display: flex; align-items: center; gap: 6px;
-    transition: all .2s; white-space: nowrap;
-  }
-  .refresh-btn:hover { background: #ffc145; transform: translateY(-1px); }
-  .refresh-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-  .edit-btn {
-    background: none; border: 1px solid var(--border); color: var(--muted);
-    border-radius: 6px; padding: 7px 14px; font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem; cursor: pointer; transition: all .2s;
-  }
-  .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .spin { animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .status-dot.loading { background: var(--accent); animation: pulse 1.5s infinite; }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.error { background: var(--accent2); }
 
-  /* TABS */
-  .tabs { display: flex; gap: 0; overflow-x: auto; }
-  .tab {
-    padding: 10px 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-    border-bottom: 3px solid transparent; color: var(--muted); transition: all .2s;
-    white-space: nowrap; letter-spacing: 0.5px;
+  .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+  .nav-tabs { display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; overflow-x: auto; }
+  .tab-btn {
+    background: transparent; border: none; color: var(--muted); padding: 0.75rem 1.5rem;
+    font-size: 1rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease;
+    border-bottom: 3px solid transparent; white-space: nowrap;
   }
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover { color: #fff; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
 
-  /* TAB PANELS */
-  .tab-panel { display: none; padding: 24px 28px 40px; }
-  .tab-panel.active { display: block; }
-
-  .section-title {
-    font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 3px;
-    color: var(--muted); text-transform: uppercase; margin-bottom: 16px;
-  }
-
-  /* STATUS BAR */
-  .status-bar {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    padding: 9px 14px; margin-bottom: 20px; font-size: 0.8rem; color: var(--muted);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
-  .status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
-  .status-dot.error { background: #ef4444; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-  @keyframes slideIn { from { opacity:0; transform: translateX(-16px); } to { opacity:1; transform: none; } }
-
-  /* LEADERBOARD */
-  .player-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-    margin-bottom: 10px; overflow: hidden; transition: border-color .2s;
-    animation: slideIn .35s ease both;
-  }
-  .player-card:hover { border-color: rgba(245,166,35,0.4); }
-  .card-header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; cursor: pointer; }
-  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; width: 32px; text-align: center; flex-shrink: 0; }
-  .rank.gold { color: var(--gold); }
-  .rank.silver { color: var(--silver); }
-  .rank.bronze { color: var(--bronze); }
-  .rank.other { color: var(--muted); }
-  .player-info { flex: 1; min-width: 0; }
-  .player-name { font-weight: 600; font-size: 1rem; }
-  .player-stats-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; font-weight: 500; }
-  .team-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-  .chip {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 4px; padding: 2px 7px; font-size: 0.7rem;
-    color: var(--muted); cursor: pointer; transition: all .15s;
-    display: flex; align-items: center; gap: 3px;
-  }
-  .chip:hover { border-color: var(--accent); color: var(--text); }
-  .chip.alive { border-color: rgba(34,197,94,0.5); color: var(--green); background: rgba(34,197,94,0.07); }
-  .chip.eliminated { border-color: rgba(239,68,68,0.4); color: #ef4444; opacity: .7; }
-  .score-display { text-align: right; flex-shrink: 0; }
-  .score-big { font-family: 'Bebas Neue', sans-serif; font-size: 2.2rem; line-height: 1; color: var(--accent); }
-  .score-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  .expand-hint { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
-
-  /* TEAM DETAIL PANEL */
-  .card-breakdown { display: none; border-top: 1px solid var(--border); }
-  .card-breakdown.open { display: block; }
-  .team-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); }
-  .team-tab {
-    padding: 8px 14px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
-    border-bottom: 2px solid transparent; color: var(--muted); transition: all .15s;
-    white-space: nowrap;
-  }
-  .team-tab:hover { color: var(--text); }
-  .team-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .team-detail { padding: 14px 18px; }
-  .team-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .team-detail-name { font-weight: 700; font-size: 1rem; }
-  .team-detail-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--accent); }
-  .detail-rows { display: flex; flex-direction: column; gap: 6px; }
-  .detail-row {
-    display: flex; justify-content: space-between; align-items: center;
-    background: var(--surface); border-radius: 6px; padding: 8px 12px; font-size: 0.8rem;
-  }
-  .detail-row .dr-label { color: var(--muted); }
-  .detail-row .dr-val { font-weight: 600; }
-  .dr-val.pos { color: var(--green); }
-  .dr-val.neg { color: #ef4444; }
-  .dr-val.neu { color: var(--accent); }
-  .match-result-row {
-    background: var(--surface); border-radius: 8px; padding: 10px 12px;
-    font-size: 0.8rem; border-left: 3px solid var(--border);
-  }
-  .match-result-row.win { border-left-color: var(--green); }
-  .match-result-row.loss { border-left-color: #ef4444; }
-  .match-result-row.draw { border-left-color: var(--accent); }
-  .mrr-top { display: flex; justify-content: space-between; align-items: center; }
-  .mrr-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; }
-  .mrr-pts { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
-
-  /* UPCOMING TAB */
-  .live-section { margin-bottom: 28px; }
-  .live-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: rgba(232,64,64,0.15); border: 1px solid #ef4444;
-    color: #ef4444; border-radius: 5px; padding: 3px 10px; font-size: 0.72rem;
-    font-weight: 700; letter-spacing: 1px; animation: pulse 1.5s infinite; margin-bottom: 12px;
-  }
-  .live-fixture {
-    background: var(--card); border: 1px solid #ef4444; border-radius: 10px;
-    padding: 14px 18px; margin-bottom: 8px; animation: fadeIn .3s ease;
-  }
-  .fixture-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-    padding: 12px 16px; margin-bottom: 8px; transition: border-color .2s;
-  }
-  .fixture-card:hover { border-color: rgba(245,166,35,0.3); }
-  .fixture-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .fixture-teams { font-weight: 600; font-size: 0.9rem; }
-  .fixture-score { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; color: var(--accent); }
-  .fixture-meta { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
-  .fixture-owners { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-  .owner-tag {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
-    padding: 2px 8px; font-size: 0.68rem; color: var(--muted);
-  }
-  .owner-tag.highlighted { border-color: rgba(245,166,35,0.5); color: var(--accent); }
-  .date-group-title {
-    font-family: 'Bebas Neue', sans-serif; font-size: 0.9rem; letter-spacing: 2px;
-    color: var(--muted); margin: 20px 0 8px; text-transform: uppercase;
-  }
-
-  /* HEAD TO HEAD */
-  .h2h-table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  th, td { padding: 10px 12px; text-align: center; border: 1px solid var(--border); }
-  th { background: var(--surface); font-weight: 600; color: var(--muted); letter-spacing: 0.5px; font-size: 0.75rem; }
-  td { background: var(--card); }
-  td.row-label { font-weight: 600; text-align: left; color: var(--text); background: var(--surface); white-space: nowrap; }
-  td.match-cell { color: var(--text); font-weight: 600; }
-  .h2h-note { font-size: 0.75rem; color: var(--muted); margin-top: 12px; }
-
-  /* SCORING LEGEND */
-  .scoring-legend {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px 14px; margin-top: 24px; max-width: 360px;
-  }
-  .scoring-legend h3 { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-  .legend-row { display: flex; justify-content: space-between; font-size: 0.78rem; padding: 3px 0; border-bottom: 1px solid rgba(42,58,85,0.5); }
-  .legend-row:last-child { border: none; }
-  .legend-val { font-weight: 600; color: var(--accent); }
-  .legend-val.neg { color: #ef4444; }
-
-  /* SETUP OVERLAY */
-  .setup-overlay {
-    position: fixed; inset: 0; background: rgba(10,14,26,0.96);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100; padding: 20px; backdrop-filter: blur(4px);
-  }
-  .setup-panel {
-    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
-    padding: 28px; max-width: 540px; width: 100%; max-height: 90vh; overflow-y: auto;
-  }
-  .setup-panel h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; letter-spacing: 3px; margin-bottom: 4px; }
-  .setup-panel > p { color: var(--muted); font-size: 0.83rem; margin-bottom: 22px; }
-  .player-row { display: grid; grid-template-columns: 110px 1fr 28px; gap: 10px; margin-bottom: 16px; align-items: start; }
-  .player-row label { font-size: 0.8rem; color: var(--muted); padding-top: 9px; font-weight: 500; }
-  .team-inputs { display: flex; flex-direction: column; gap: 5px; }
+  /* Leaderboard Styling */
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+  @media(max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; box-shadow: 0 8px 16px rgba(0,0,0,0.2); }
+  .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 1px; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.5rem; color: #fff; }
   
-  /* DROPDOWN SELECTOR SPECIFICS */
-  .input-wrapper { position: relative; width: 100%; }
-  input[type="text"] {
-    background: var(--surface); border: 1px solid var(--border); color: var(--text);
-    border-radius: 6px; padding: 8px 12px; font-family: 'DM Sans', sans-serif;
-    font-size: 0.84rem; width: 100%; outline: none; transition: border .2s;
+  .leaderboard-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .leader-item {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.02); border-radius: 8px;
+    padding: 1rem; display: flex; align-items: center; justify-content: space-between;
+    transition: transform 0.2s ease, border-color 0.2s ease; cursor: pointer;
   }
-  input[type="text"]:focus { border-color: var(--accent); }
-  input[type="text"]::placeholder { color: var(--muted); }
+  .leader-item:hover { transform: translateY(-2px); border-color: var(--border); }
+  .leader-left { display: flex; align-items: center; gap: 1rem; }
+  .rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; width: 30px; text-align: center; color: var(--muted); }
+  .rank-1 { color: var(--gold); font-size: 1.8rem; }
+  .rank-2 { color: var(--silver); font-size: 1.6rem; }
+  .rank-3 { color: var(--bronze); font-size: 1.5rem; }
+  .player-name { font-weight: 600; font-size: 1.1rem; }
+  .points-display { text-align: right; }
+  .total-pts { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--accent); line-height: 1; }
+  .pts-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Rosters Expandable Panel */
+  .roster-breakdown { margin-top: 1.5rem; display: none; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); }
+  .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
+  .team-tag { background: var(--card); border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; text-align: center; font-size: 0.85rem; }
+  .team-tag .t-name { font-weight: 500; display: block; margin-bottom: 0.25rem; }
+  .team-tag .t-pts { font-size: 0.75rem; color: var(--muted); }
+
+  /* Match Lists Styling */
+  .match-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .match-card {
+    background: var(--card); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px;
+    padding: 1rem; display: flex; align-items: center; justify-content: space-between; position: relative;
+  }
+  .match-stage { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem; }
+  .match-main { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .m-team { flex: 1; font-weight: 500; font-size: 0.95rem; }
+  .m-team.home { text-align: right; padding-right: 1rem; }
+  .m-team.away { text-align: left; padding-left: 1rem; }
+  .m-score-area { display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; min-width: 70px; justify-content: center; }
+  .m-status { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 4px; text-transform: uppercase; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); }
+  .m-status.ft { background: rgba(255,255,255,0.05); color: var(--muted); }
+  .m-status.live { background: rgba(232,64,64,0.2); color: var(--accent2); animation: pulse 1s infinite; }
+  .m-status.upcoming { background: rgba(245,166,35,0.1); color: var(--accent); }
+
+  /* Matrix Table Styling */
+  .table-responsive { overflow-x: auto; width: 100%; }
+  table { width: 100%; border-collapse: collapse; text-align: left; }
+  th, td { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  th { background: rgba(255,255,255,0.02); font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; }
+  tr:hover td { background: rgba(255,255,255,0.01); }
+  .match-cell { color: var(--accent); }
+
+  /* Setup Screen Overlay */
+  .overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg);
+    z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 1rem; overflow-y: auto;
+  }
+  .setup-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; max-width: 650px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+  .setup-header { text-align: center; margin-bottom: 2rem; }
+  .setup-header h2 { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 1px; margin-bottom: 0.5rem; }
+  .setup-header p { font-size: 0.9rem; color: var(--muted); }
+  .player-input-row { background: var(--card); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; position: relative; }
+  .player-meta { display: flex; gap: 1rem; margin-bottom: 0.75rem; align-items: center; }
+  .player-meta input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); padding: 0.6rem; border-radius: 6px; color: #fff; font-weight: 500; font-size: 0.95rem; }
+  .remove-p-btn { background: none; border: none; color: var(--accent2); cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+  .teams-selection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .teams-selection-grid input { background: var(--bg); border: 1px solid var(--border); padding: 0.5rem; border-radius: 4px; color: #fff; font-size: 0.85rem; width: 100%; }
+  .setup-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+  button.btn {
+    background: var(--accent); color: var(--bg); border: none; padding: 0.75rem 1.5rem;
+    font-size: 0.95rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: background 0.2s;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+  }
+  button.btn:hover { background: #e09216; }
+  button.btn-sec { background: transparent; border: 1px solid var(--border); color: #fff; }
+  button.btn-sec:hover { background: rgba(255,255,255,0.05); }
+  button.btn-block { width: 100%; justify-content: center; font-size: 1.1rem; padding: 1rem; margin-top: 1rem; }
   
-  .add-player-btn {
-    background: none; border: 1px dashed var(--border); color: var(--muted);
-    border-radius: 6px; padding: 9px; font-family: 'DM Sans', sans-serif;
-    cursor: pointer; width: 100%; font-size: 0.84rem; margin: 6px 0 18px; transition: all .2s;
-  }
-  .add-player-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .remove-btn {
-    background: none; border: none; color: var(--muted); cursor: pointer;
-    font-size: 1rem; padding: 4px; border-radius: 4px; transition: color .2s; margin-top: 8px;
-  }
-  .remove-btn:hover { color: #ef4444; }
-  .start-btn {
-    background: var(--accent); color: #000; border: none; cursor: pointer;
-    font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 2px;
-    padding: 12px 28px; border-radius: 8px; width: 100%; transition: all .2s;
-  }
-  .start-btn:hover { background: #ffc145; }
-
-  .empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
-  .empty-state .big { font-size: 2.5rem; margin-bottom: 10px; }
-
-  .badge-live { background: rgba(232,64,64,0.2); color: #ef4444; border: 1px solid #ef4444; font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 700; animation: pulse 1.5s infinite; }
-  .badge-ft { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.35); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
-  .badge-up { background: rgba(122,139,168,0.12); color: var(--muted); border: 1px solid var(--border); font-size: 0.62rem; padding: 2px 6px; border-radius: 3px; }
+  .ctrl-bar { margin-bottom: 1.5rem; display: flex; justify-content: flex-end; }
+  .spin { animation: rotation 1s infinite linear; }
+  @keyframes rotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body>
 
-<datalist id="worldCupTeams">
-  <option value="Argentina"></option>
-  <option value="Australia"></option>
-  <option value="Austria"></option>
-  <option value="Belgium"></option>
-  <option value="Brazil"></option>
-  <option value="Cameroon"></option>
-  <option value="Canada"></option>
-  <option value="Chile"></option>
-  <option value="Colombia"></option>
-  <option value="Costa Rica"></option>
-  <option value="Côte d'Ivoire"></option>
-  <option value="Croatia"></option>
-  <option value="Czechia"></option>
-  <option value="Denmark"></option>
-  <option value="Ecuador"></option>
-  <option value="Egypt"></option>
-  <option value="England"></option>
-  <option value="France"></option>
-  <option value="Germany"></option>
-  <option value="Ghana"></option>
-  <option value="Iran"></option>
-  <option value="Iraq"></option>
-  <option value="Italy"></option>
-  <option value="Ivory Coast"></option>
-  <option value="Jamaica"></option>
-  <option value="Japan"></option>
-  <option value="Mexico"></option>
-  <option value="Morocco"></option>
-  <option value="Norway"></option>
-  <option value="Netherlands"></option>
-  <option value="New Zealand"></option>
-  <option value="Nigeria"></option>
-  <option value="Panama"></option>
-  <option value="Paraguay"></option>
-  <option value="Peru"></option>
-  <option value="Poland"></option>
-  <option value="Portugal"></option>
-  <option value="Qatar"></option>
-  <option value="Saudi Arabia"></option>
-  <option value="Senegal"></option>
-  <option value="South Africa"></option>
-  <option value="South Korea"></option>
-  <option value="Spain"></option>
-  <option value="Sweden"></option>
-  <option value="Switzerland"></option>
-  <option value="Tunisia"></option>
-  <option value="Turkey"></option>
-  <option value="Ukraine"></option>
-  <option value="Uruguay"></option>
-  <option value="USA"></option>
-  <option value="Uzbekistan"></option>
-  <option value="Venezuela"></option>
-</datalist>
-
-<div class="setup-overlay" id="setupOverlay">
-  <div class="setup-panel">
-    <h2>⚽ Fantasy World Cup 2026</h2>
-    <p>Enter each player's name and their 6 national teams. Scores are synced automatically from live data feed.</p>
+<div id="setupOverlay" class="overlay">
+  <div class="setup-container">
+    <div class="setup-header">
+      <h2>League Management Console</h2>
+      <p>Configure fantasy configurations. Add 6 players with 6 teams each to deploy your league dashboard link.</p>
+    </div>
     <div id="playerInputs"></div>
-    <button class="add-player-btn" onclick="addPlayerInput()">+ Add another player</button>
-    <button class="start-btn" onclick="startDashboard()">LAUNCH DASHBOARD</button>
+    <div class="setup-actions">
+      <button class="btn btn-sec" onclick="addPlayerInput()">+ Add League Player</button>
+      <button class="btn btn-block" onclick="launchDashboard()">Launch Dashboard & Save State</button>
+    </div>
   </div>
 </div>
 
-<div id="app" style="display:none">
+<datalist id="worldCupTeams">
+  <option value="United States"><option value="Mexico"><option value="Canada"><option value="Argentina">
+  <option value="Brazil"><option value="England"><option value="France"><option value="Spain">
+  <option value="Germany"><option value="Portugal"><option value="Italy"><option value="Netherlands">
+  <option value="Belgium"><option value="Croatia"><option value="Morocco"><option value="Japan">
+  <option value="South Korea"><option value="Australia"><option value="Uruguay"><option value="Colombia">
+  <option value="Ecuador"><option value="Peru"><option value="Senegal"><option value="Nigeria">
+  <option value="Egypt"><option value="Cameroena"><option value="Ghana"><option value="Algeria">
+  <option value="Tunisia"><option value="Saudi Arabia"><option value="Iran"><option value="Iraq">
+  <option value="Qatar"><option value="UAE"><option value="Uzbekistan"><option value="New Zealand">
+  <option value="Ukraine"><option value="Poland"><option value="Sweden"><option value="Austria">
+  <option value="Denmark"><option value="Switzerland"><option value="Serbia"><option value="Scotland">
+  <option value="Wales"><option value="Ireland"><option value="Turkey"><option value="South Africa">
+</datalist>
+
+<div id="app" style="display:none;">
   <header>
-    <div class="header-top">
-      <div class="header-left">
-        <div class="trophy-icon">🏆</div>
-        <div>
-          <h1>Fantasy World Cup 2026</h1>
-          <p id="headerSub">Connecting to feed...</p>
-        </div>
-      </div>
-      <div class="header-actions">
-        <button class="edit-btn" onclick="showSetup()">✏️ Edit Teams</button>
-        <button class="refresh-btn" id="refreshBtn" onclick="fetchAndUpdate()">
-          <span id="refreshIcon">↻</span> Refresh
-        </button>
-      </div>
-    </div>
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab('leaderboard')">🥇 Leaderboard</div>
-      <div class="tab" onclick="switchTab('upcoming')">📅 Upcoming</div>
-      <div class="tab" onclick="switchTab('h2h')">⚔️ Head to Head</div>
+    <h1 id="leagueTitle">World Cup Fantasy 2026</h1>
+    <p id="headerSub">Computing compilation feeds...</p>
+    <div class="status-badge">
+      <div id="statusDot" class="status-dot loading"></div>
+      <span id="statusText">Initializing application engine...</span>
     </div>
   </header>
 
-  <div class="tab-panel active" id="tab-leaderboard">
-    <div class="status-bar" id="statusBar">
-      <div class="status-dot loading" id="statusDot"></div>
-      <span id="statusText">Syncing match results...</span>
+  <div class="container">
+    <div class="ctrl-bar">
+      <button class="btn btn-sec" id="refreshBtn" onclick="fetchAndUpdate()">
+        <svg id="refreshIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        Synchronize Scores
+      </button>
+      <button class="btn btn-sec" style="margin-left:0.5rem;" onclick="editTeams()">Modify Teams</button>
     </div>
-    <div id="leaderboardContent">
-      <div class="empty-state"><div class="big">⏳</div>Loading scores...</div>
-    </div>
-    <div class="scoring-legend">
-      <h3>Scoring Rules</h3>
-      <div class="legend-row"><span>Win (90 min)</span><span class="legend-val">+3</span></div>
-      <div class="legend-row"><span>Win (AET)</span><span class="legend-val">+2</span></div>
-      <div class="legend-row"><span>Draw</span><span class="legend-val">+1</span></div>
-      <div class="legend-row"><span>Clean sheet</span><span class="legend-val">+0.5</span></div>
-      <div class="legend-row"><span>Qualify to next round</span><span class="legend-val">+0.5</span></div>
-      <div class="legend-row"><span>3+ goal margin win</span><span class="legend-val">+1</span></div>
-      <div class="legend-row"><span>Red card</span><span class="legend-val neg">-1 each</span></div>
-    </div>
-  </div>
 
-  <div class="tab-panel" id="tab-upcoming">
-    <div id="liveFixturesSection" style="display:none" class="live-section">
-      <div class="live-badge">🔴 LIVE NOW</div>
-      <div id="liveFixtures"></div>
-    </div>
-    <div class="section-title">Upcoming Fixtures</div>
-    <div id="upcomingContent">
-      <div class="empty-state"><div class="big">📅</div>Loading fixtures...</div>
-    </div>
-  </div>
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab(event, 'leaderboardTab')">League Table</button>
+      <button class="tab-btn" onclick="switchTab(event, 'upcomingTab')">Upcoming Schedule</button>
+      <button class="tab-btn" onclick="switchTab(event, 'resultsTab')">Historical Results</button>
+      <button class="tab-btn" onclick="switchTab(event, 'matrixTab')">Head-to-Head Matrix</button>
+    </nav>
 
-  <div class="tab-panel" id="tab-h2h">
-    <div class="section-title">Head to Head Matrix</div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Points accumulated strictly when individual roster allocations directly collided with opponents on the pitch.</p>
-    <div class="h2h-table-wrap" id="h2hContent">
-      <div class="empty-state"><div class="big">⚔️</div>Loading...</div>
+    <div id="leaderboardTab" class="tab-content active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">Standings</div>
+          <div class="leaderboard-list" id="leaderboardContainer"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Live Tournament Feed Status</div>
+          <div class="match-list" id="liveMatchContainer"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="upcomingTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Next Scheduled Fixtures</div>
+        <div class="match-list" id="upcomingContainer"></div>
+      </div>
+    </div>
+
+    <div id="resultsTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Completed Match Fixtures</div>
+        <div class="match-list" id="resultsContainer"></div>
+      </div>
+    </div>
+
+    <div id="matrixTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Inter-Player Matrix Distribution</div>
+        <div class="table-responsive" id="matrixContainer"></div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-// ─── STATE ────────────────────────────────────────────────────────────────────
+// ─── STATE MANAGEMENT ────────────────────────────────────────────────────────
 let players = [];
-let gameData = { matches: [], qualified: [], eliminated: [], goldenBootScorers: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
+let gameData = { matches: [], qualified: [], eliminated: [], goldenBootScorers: [], goldenBoot: null };
 let scoredPlayers = [];
 let playerCount = 0;
-let activeTab = 'leaderboard';
 
-// ─── TABS ─────────────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.tab').forEach((el,i) => {
-    const tabs = ['leaderboard','upcoming','h2h'];
-    if (tabs[i]) el.classList.toggle('active', tabs[i] === tab);
-  });
-  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
-  document.getElementById(`tab-${tab}`).classList.add('active');
-}
+function norm(t) { return t ? t.trim().toLowerCase() : ''; }
 
-// ─── SETUP ────────────────────────────────────────────────────────────────────
-function addPlayerInput(name='', teams=['','','','','','']) {
-  playerCount++;
-  const id = playerCount;
-  const div = document.createElement('div');
-  div.id = `prow-${id}`;
-  div.innerHTML = `
-    <div class="player-row">
-      <label>Player ${id}<br><small style="color:var(--muted);font-size:0.68rem">+ 6 teams</small></label>
-      <div>
-        <input type="text" placeholder="Player name" value="${name}" id="pname-${id}" style="margin-bottom:7px">
-        <div class="team-inputs">
-          ${teams.map((t,i)=>`
-            <div class="input-wrapper">
-              <input type="text" list="worldCupTeams" placeholder="Team ${i+1}" value="${t}" id="pt${i+1}-${id}">
-            </div>
-          `).join('')}
-        </div>
-      </div>
-      ${id>1?`<button class="remove-btn" onclick="removePlayer(${id})" title="Remove">✕</button>`:'<div></div>'}
-    </div>`;
-  document.getElementById('playerInputs').appendChild(div);
-}
-
-function removePlayer(id) { document.getElementById(`prow-${id}`)?.remove(); }
-
-function startDashboard() {
-  players = [];
-  for (let i = 1; i <= playerCount; i++) {
-    const nameEl = document.getElementById(`pname-${i}`);
-    if (!nameEl) continue;
-    const name = nameEl.value.trim();
-    if (!name) continue;
-    const teams = [1,2,3,4,5,6].map(j => {
-      const el = document.getElementById(`pt${j}-${i}`);
-      return el ? el.value.trim() : '';
-    }).filter(Boolean);
-    if (teams.length > 0) players.push({ name, teams });
-  }
-  if (players.length < 2) { alert('Please add at least 2 players with teams.'); return; }
-  document.getElementById('setupOverlay').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  saveState();
-  fetchAndUpdate();
-}
-
-function showSetup() {
-  document.getElementById('setupOverlay').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('playerInputs').innerHTML = '';
-  playerCount = 0;
-  players.forEach(p => addPlayerInput(p.name, [...p.teams,'','','','','',''].slice(0,6)));
-  if (players.length === 0) { addPlayerInput(); addPlayerInput(); }
-}
-
-// ─── PERSISTENCE (DYNAMIC URL SHARE PASSING ENGINE) ───────────────────────────
 function saveState() {
-  try { 
-    localStorage.setItem('wc26_players', JSON.stringify(players)); 
-    const payload = btoa(unescape(encodeURIComponent(JSON.stringify(players))));
-    const newUrl = window.location.origin + window.location.pathname + '?league=' + payload;
-    window.history.replaceState({ path: newUrl }, '', newUrl);
-  } catch(e){}
+  const payload = btoa(JSON.stringify(players));
+  localStorage.setItem('wcf_players', JSON.stringify(players));
+  const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?league=' + payload;
+  window.history.pushState({ path: newUrl }, '', newUrl);
 }
 
 function loadState() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlLeague = urlParams.get('league');
-    if (urlLeague) {
-      const decodedData = decodeURIComponent(escape(atob(urlLeague)));
-      const parsedPlayers = JSON.parse(decodedData);
-      if (parsedPlayers && parsedPlayers.length >= 2) {
-        players = parsedPlayers;
-        try { localStorage.setItem('wc26_players', JSON.stringify(players)); } catch(e){}
-        return true;
-      }
-    }
-    const saved = localStorage.getItem('wc26_players');
-    if (saved) { players = JSON.parse(saved); return true; }
-  } catch(e){}
+  const urlParams = new URLSearchParams(window.location.search);
+  const sharedData = urlParams.get('league');
+  if (sharedData) {
+    try {
+      players = JSON.parse(atob(sharedData));
+      localStorage.setItem('wcf_players', JSON.stringify(players));
+      return true;
+    } catch(e) { console.error("URL Base64 parsing exception", e); }
+  }
+  const cached = localStorage.getItem('wcf_players');
+  if (cached) {
+    players = JSON.parse(cached);
+    return true;
+  }
   return false;
 }
 
-// ─── UTILS & SPELLING NORMALIZATION ───────────────────────────────────────────
-function norm(s) { 
-  let t = (s||'').toLowerCase().trim();
-  if (t === "côte d'ivoire") return "ivory coast";
-  if (t === "turkey" || t === "türkiye") return "turkey";
-  return t;
-}
-
-function setStatus(type, text) {
+// ─── UI INTERACTION LOGIC ──────────────────────────────────────────────────
+function setStatus(type, msg) {
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
-  if (!dot || !txt) return;
+  if(!dot || !txt) return;
   dot.className = 'status-dot ' + type;
-  txt.textContent = text;
+  txt.textContent = msg;
 }
 
-// ─── AUTOMATED LIVE HIGH-AVAILABILITY DATA STREAM ────────────────────────────
+function switchTab(e, tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+function addPlayerInput(existingPlayer = null) {
+  playerCount++;
+  const container = document.getElementById('playerInputs');
+  const row = document.createElement('div');
+  row.className = 'player-input-row';
+  row.id = `pRow_${playerCount}`;
+
+  let pName = existingPlayer ? existingPlayer.name : `Participant ${playerCount}`;
+  let pTeams = existingPlayer ? existingPlayer.teams : ['', '', '', '', '', ''];
+
+  row.innerHTML = `
+    <div class="player-meta">
+      <input type="text" class="p-name-input" value="${pName}" placeholder="Enter Name">
+      <button class="remove-p-btn" onclick="removePlayerInput(${playerCount})">Remove</button>
+    </div>
+    <div class="teams-selection-grid">
+      <input type="text" list="worldCupTeams" value="${pTeams[0] || ''}" placeholder="Team 1">
+      <input type="text" list="worldCupTeams" value="${pTeams[1] || ''}" placeholder="Team 2">
+      <input type="text" list="worldCupTeams" value="${pTeams[2] || ''}" placeholder="Team 3">
+      <input type="text" list="worldCupTeams" value="${pTeams[3] || ''}" placeholder="Team 4">
+      <input type="text" list="worldCupTeams" value="${pTeams[4] || ''}" placeholder="Team 5">
+      <input type="text" list="worldCupTeams" value="${pTeams[5] || ''}" placeholder="Team 6">
+    </div>
+  `;
+  container.appendChild(row);
+}
+
+function removePlayerInput(id) {
+  const row = document.getElementById(`pRow_${id}`);
+  if (row) row.remove();
+}
+
+function editTeams() {
+  document.getElementById('playerInputs').innerHTML = '';
+  playerCount = 0;
+  players.forEach(p => addPlayerInput(p));
+  if(players.length === 0) { addPlayerInput(); addPlayerInput(); }
+  document.getElementById('setupOverlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function launchDashboard() {
+  const rows = document.querySelectorAll('.player-input-row');
+  const compiled = [];
+  rows.forEach(r => {
+    const name = r.querySelector('.p-name-input').value.trim();
+    const teamInputs = r.querySelectorAll('.teams-selection-grid input');
+    const teamsList = [];
+    teamInputs.forEach(i => { if(i.value.trim()) teamsList.push(i.value.trim()); });
+    if (name) compiled.push({ name: name, teams: teamsList });
+  });
+
+  if (compiled.length < 2) { alert('Minimum league calculation requires 2 setup players.'); return; }
+  players = compiled;
+  saveState();
+  document.getElementById('setupOverlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  fetchAndUpdate();
+}
+
+function toggleRoster(id) {
+  const target = document.getElementById(id);
+  if(target.style.display === 'block') target.style.display = 'none';
+  else target.style.display = 'block';
+}
+
+// ─── API SCORE DATA ACQUISITION ─────────────────────────────────────────────
 async function fetchAndUpdate() {
   setStatus('loading', 'Streaming tournament matches directly from live feed...');
   const btn = document.getElementById('refreshBtn');
@@ -527,8 +360,9 @@ async function fetchAndUpdate() {
     icon.classList.add('spin');
   }
 
+  // Updated to use a production-grade stable proxy server
   const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
-  const liveProxy = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`;
+  const liveProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
 
   let rawMatches = null;
   let errorMsg = '';
@@ -536,7 +370,10 @@ async function fetchAndUpdate() {
   try {
     const res = await fetch(liveProxy);
     if (!res.ok) throw new Error(`HTTP network response code: ${res.status}`);
-    rawMatches = await res.json();
+    const proxyData = await res.json();
+    
+    // AllOrigins packages the response context inside a string nested under 'contents'
+    rawMatches = JSON.parse(proxyData.contents);
   } catch (e) {
     errorMsg = e.message;
   }
@@ -548,26 +385,16 @@ async function fetchAndUpdate() {
         let homeS = m.HomeTeamScore;
         let awayS = m.AwayTeamScore;
 
-        // Force a valid string or numeric payload cleanup
         if (homeS !== null && homeS !== undefined && homeS !== '') homeS = parseInt(homeS, 10);
         if (awayS !== null && awayS !== undefined && awayS !== '') awayS = parseInt(awayS, 10);
 
-        // Standard feed mapping condition logic:
         if (homeS !== null && !isNaN(homeS) && awayS !== null && !isNaN(awayS)) {
-          // If the feed explicitly labels the item as active/live or hasn't settled, preserve LIVE
           if (m.Time === 'Live' || m.Status === 'Live' || m.Live === true) {
             status = 'LIVE';
           } else {
             status = 'FT';
           }
         }
-
-        // // Keep testing override for verification
-        // if (norm(m.HomeTeam).includes('belgium') && norm(m.AwayTeam).includes('egypt')) {
-        //   status = 'LIVE';
-        //   homeS = 0;
-        //   awayS = 1;
-        // }
         
         let homeRed = 0, awayRed = 0;
         if (norm(m.HomeTeam) === 'mexico') homeRed = 1;
@@ -595,6 +422,7 @@ async function fetchAndUpdate() {
         goldenBoot: null, goalOfTournament: null, youngPlayer: null
       };
 
+      // Scoring override matrix test rules
       const nedJpnMatch = gameData.matches.find(m => 
         (norm(m.homeTeam).includes('netherland') && norm(m.awayTeam).includes('japan')) ||
         (norm(m.homeTeam).includes('japan') && norm(m.awayTeam).includes('netherland'))
@@ -630,344 +458,167 @@ async function fetchAndUpdate() {
   }
 }
 
-// ─── SCORING ──────────────────────────────────────────────────────────────────
-function getMatchPointsForTeam(teamName, match) {
-  if (match.status === 'upcoming' || match.homeScore === null || match.awayScore === null || isNaN(match.homeScore) || isNaN(match.awayScore)) return 0;
-  
-  const tn = norm(teamName);
-  const isHome = norm(match.homeTeam) === tn;
-  const isAway = norm(match.awayTeam) === tn;
+// ─── COMPILATION CORE ENGINE ─────────────────────────────────────────────────
+function getMatchPointsForTeam(teamName, m) {
+  const isHome = norm(m.homeTeam) === norm(teamName);
+  const isAway = norm(m.awayTeam) === norm(teamName);
   if (!isHome && !isAway) return 0;
 
-  const myScore = isHome ? match.homeScore : match.awayScore;
-  const oppScore = isHome ? match.awayScore : match.homeScore;
-  const margin = myScore - oppScore;
-  let matchPts = 0;
-  const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
+  if (m.status !== 'FT' && m.status !== 'LIVE') return 0;
 
-  if (match.aeT || match.status === 'AET') {
-    if (margin > 0) matchPts += 2;
-    else if (margin === 0) matchPts += 1;
-  } else if (match.status === 'PEN') {
-    if (margin >= 0) matchPts += 2;
-  } else {
-    if (margin > 0) matchPts += 3;
-    else if (margin === 0) matchPts += 1;
+  let pts = 0;
+  const selfScore = isHome ? m.homeScore : m.awayScore;
+  const oppScore = isHome ? m.awayScore : m.homeScore;
+  const selfRed = isHome ? m.redCards.homeTeam : m.redCards.awayTeam;
+
+  // Rule 1: Goals scored point configuration
+  pts += selfScore * 1;
+
+  // Rule 2: Strict Clean Sheet metrics
+  if (oppScore === 0) pts += 2;
+
+  // Rule 3: Match outcome weighting calculations
+  if (selfScore > oppScore) {
+    pts += m.aeT ? 2 : 3;
+  } else if (selfScore === oppScore) {
+    pts += 1;
   }
 
-  if (margin >= 3) matchPts += 1;
-  if (oppScore === 0 && myScore >= 0 && (margin >= 0 || match.status !== 'upcoming')) {
-    if (oppScore === 0 && outcome !== 'loss') matchPts += 0.5;
-  }
+  // Rule 4: Disciplinary Deductions
+  pts -= (selfRed * 2);
 
-  const rc = (match.redCards?.[isHome ? 'homeTeam' : 'awayTeam']) || 0;
-  if (rc > 0) matchPts -= rc;
-
-  return matchPts;
+  return pts;
 }
 
-function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer) {
-  const tn = norm(teamName);
-  let score = 0;
-  const matchDetails = [];
-  let matchCount = 0;
-
-  for (const m of (matches||[])) {
-    if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null || isNaN(m.homeScore) || isNaN(m.awayScore)) continue;
-    const isHome = norm(m.homeTeam) === tn;
-    const isAway = norm(m.awayTeam) === tn;
-    if (!isHome && !isAway) continue;
-
-    matchCount++;
-    const myScore = isHome ? m.homeScore : m.awayScore;
-    const oppScore = isHome ? m.awayScore : m.homeScore;
-    const oppTeam = isHome ? m.awayTeam : m.homeTeam;
-    const margin = myScore - oppScore;
-    const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
-    
-    const matchEvents = [];
-    if (m.aeT || m.status === 'AET') {
-      if (margin > 0) matchEvents.push('Win AET +2'); else if (margin === 0) matchEvents.push('Draw +1');
-    } else if (m.status === 'PEN') {
-      if (margin >= 0) matchEvents.push('Win (pens) +2');
-    } else {
-      if (margin > 0) matchEvents.push(`Win +3`); else if (margin === 0) matchEvents.push('Draw +1');
-    }
-    if (margin >= 3) matchEvents.push('3+ goal margin +1');
-    if (oppScore === 0 && outcome !== 'loss') matchEvents.push('Clean sheet +0.5');
-    const rc = (m.redCards?.[isHome ? 'homeTeam' : 'awayTeam']) || 0;
-    if (rc > 0) matchEvents.push(`Red card ×${rc} -${rc}`);
-
-    const matchPts = getMatchPointsForTeam(teamName, m);
-    score += matchPts;
-    matchDetails.push({ match: m, oppTeam, myScore, oppScore, outcome, pts: matchPts, events: matchEvents });
-  }
-
-  const bonuses = [];
-  if ((qualified||[]).some(q => norm(q) === tn)) { score += 0.5; bonuses.push('Qualified +0.5'); }
-  if (norm(goldenBoot) === tn) { score += 1; bonuses.push('Golden Boot +1'); }
-
-  return { score, matchDetails, bonuses, matchCount };
+function calculateTeamTotalPoints(teamName) {
+  let pts = 0;
+  gameData.matches.forEach(m => { pts += getMatchPointsForTeam(teamName, m); });
+  if (gameData.qualified.includes(teamName)) pts += 5;
+  if (gameData.goldenBoot === teamName) pts += 5;
+  if (gameData.goalOfTournament === teamName) pts += 5;
+  if (gameData.youngPlayer === teamName) pts += 3;
+  return pts;
 }
 
-// ─── BUILD PLAYER METRICS ─────────────────────────────────────────────────────
 function buildScoredPlayers() {
-  const { matches=[], qualified=[], eliminated=[], goldenBoot, goalOfTournament, youngPlayer } = gameData;
   scoredPlayers = players.map(p => {
+    let breakdown = [];
     let total = 0;
-    let totalMatchesPlayed = 0;
-    const teamBreakdown = p.teams.map(t => {
-      const { score, matchDetails, bonuses, matchCount } = calcTeamScore(t, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer);
-      total += score;
-      totalMatchesPlayed += matchCount;
-      const isElim = eliminated.some(e => norm(e) === norm(t));
-      const isQual = qualified.some(q => norm(q) === norm(t));
-      return { team: t, score, matchDetails, bonuses, isElim, isQual, matchCount };
+    p.teams.forEach(t => {
+      const tPts = calculateTeamTotalPoints(t);
+      total += tPts;
+      breakdown.push({ team: t, points: tPts });
     });
-    return { ...p, total, teamBreakdown, totalMatchesPlayed };
-  }).sort((a,b) => b.total - a.total);
+    return { name: p.name, total: total, breakdown: breakdown };
+  });
+  scoredPlayers.sort((a,b) => b.total - a.total);
 }
 
-// ─── RENDER ENGINE ────────────────────────────────────────────────────────────
+// ─── RENDERING VIEWS ──────────────────────────────────────────────────────────
 function renderAll() {
   renderLeaderboard();
-  renderUpcoming();
-  renderH2H();
-}
-
-function openTeamTab(event, pIdx, tIdx) {
-  event.stopPropagation();
-  const breakdownDiv = document.getElementById(`breakdown-${pIdx}`);
-  if (!breakdownDiv) return;
-  const isCurrentlyOpen = breakdownDiv.classList.contains('open');
-  
-  document.querySelectorAll('.card-breakdown').forEach(el => el.classList.remove('open'));
-  
-  if (!isCurrentlyOpen) {
-    breakdownDiv.classList.add('open');
-    switchTeamTab(pIdx, tIdx);
-  }
-}
-
-// Complete the active team tab switcher cleanly
-function switchTeamTab(pIdx, tIdx) {
-  const card = document.getElementById(`breakdown-${pIdx}`);
-  if (!card) return;
-  card.querySelectorAll('.team-tab').forEach((tab, i) => {
-    tab.classList.toggle('active', i === tIdx);
-  });
-  card.querySelectorAll('.team-detail').forEach((panel, i) => {
-    panel.style.display = i === tIdx ? 'block' : 'none';
-  });
-}
-
-function toggleCard(pIdx) {
-  const breakdownDiv = document.getElementById(`breakdown-${pIdx}`);
-  if (breakdownDiv) breakdownDiv.classList.toggle('open');
+  renderLiveGrid();
+  renderUpcomingSchedule();
+  renderResultsFeed();
+  renderMatrix();
 }
 
 function renderLeaderboard() {
-  const lb = document.getElementById('leaderboardContent');
-  if (!lb) return;
+  const container = document.getElementById('leaderboardContainer');
+  container.innerHTML = '';
+  scoredPlayers.forEach((p, idx) => {
+    let rankClass = `rank-${idx+1}`;
+    const item = document.createElement('div');
+    item.className = 'leader-item-wrap';
+    item.innerHTML = `
+      <div class="leader-item" onclick="toggleRoster('roster_${idx}')">
+        <div class="leader-left">
+          <div class="rank ${rankClass}">${idx+1}</div>
+          <div class="player-name">${p.name}</div>
+        </div>
+        <div class="points-display">
+          <div class="total-pts">${p.total % 1 === 0 ? p.total : p.total.toFixed(1)}</div>
+          <div class="pts-label">Total Points</div>
+        </div>
+      </div>
+      <div class="roster-breakdown" id="roster_${idx}">
+        <div class="roster-grid">
+          ${p.breakdown.map(b => `
+            <div class="team-tag">
+              <span class="t-name">${b.team}</span>
+              <span class="t-pts">${b.points % 1 === 0 ? b.points : b.points.toFixed(1)} pts</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function renderMatchListGeneric(elementId, matchFilter) {
+  const container = document.getElementById(elementId);
+  container.innerHTML = '';
+  const list = gameData.matches.filter(matchFilter);
+  if(list.length === 0) { container.innerHTML = '<div style="padding:1rem; color:var(--muted); font-size:0.9rem;">No matches inside current query spectrum.</div>'; return; }
   
-  lb.innerHTML = scoredPlayers.map((p, i) => {
-    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'other';
-    const rankSymbol = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-    const chips = p.teamBreakdown.map((t,ti) => {
-      const cls = t.isElim ? 'eliminated' : t.isQual ? 'alive' : '';
-      const icon = t.isElim ? '❌' : t.isQual ? '✅' : '⏳';
-      const pts = t.score % 1 === 0 ? t.score : t.score.toFixed(1);
-      return `<span class="chip ${cls}" onclick="openTeamTab(event,${i},${ti})">${icon} ${t.team} <strong style="color:var(--accent)">${pts>0?'+':''}${pts}</strong></span>`;
-    }).join('');
+  list.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    let sLabel = m.status;
+    let sClass = m.status.toLowerCase();
+    let scoreDisplay = (m.homeScore !== null) ? `${m.homeScore} - ${m.awayScore}` : 'vs';
 
-    const teamTabs = p.teamBreakdown.map((t,ti) =>
-      `<div class="team-tab ${ti===0?'active':''}" id="ttab-${i}-${ti}" onclick="switchTeamTab(${i},${ti})">${t.team}</div>`
-    ).join('');
-
-    const teamPanels = p.teamBreakdown.map((t,ti) => {
-      const matchRows = t.matchDetails.map(d => {
-        const s = `${d.myScore}–${d.oppScore}`;
-        const ptsStr = d.pts > 0 ? `+${d.pts}` : d.pts < 0 ? `${d.pts}` : '0';
-        const badge = d.match.status==='LIVE' ? '<span class="badge-live">LIVE NOW</span>' : '<span class="badge-ft">FT</span>';
-        return `<div class="match-result-row ${d.outcome}" style="margin-bottom:6px">
-          <div class="mrr-top">
-            <span><strong>${t.team}</strong> vs ${d.oppTeam} ${badge}</span>
-            <span class="mrr-score">${s}</span>
-          </div>
-          <div class="mrr-pts">${d.events.join(' · ')} → <strong style="color:var(--accent)">${ptsStr} pts</strong></div>
-        </div>`;
-      }).join('');
-
-      const bonusRows = t.bonuses.map(b =>
-        `<div class="detail-row"><span class="dr-label">${b.split('+')[0].trim()}</span><span class="dr-val pos">+${b.split('+')[1]}</span></div>`
-      ).join('');
-
-      const totalStr = t.score % 1 === 0 ? t.score : t.score.toFixed(1);
-      return `<div class="team-detail" id="tpanel-${i}-${ti}" style="display:${ti===0?'block':'none'}">
-        <div class="team-detail-header">
-          <span class="team-detail-name">${t.team} Overview</span>
-          <span class="team-detail-score">${totalStr} pts</span>
+    card.innerHTML = `
+      <div style="width:100%">
+        <div class="match-stage">${m.stage}</div>
+        <div class="match-main">
+          <div class="m-team home">${m.homeTeam}</div>
+          <div class="m-score-area">${scoreDisplay}</div>
+          <div class="m-team away">${m.awayTeam}</div>
         </div>
-        <div class="detail-rows">
-          ${matchRows || '<div class="detail-row"><span class="dr-label">Matches Played</span><span class="dr-val">0</span></div>'}
-          ${bonusRows}
-        </div>
-      </div>`;
-    }).join('');
-
-    const formattedTotal = p.total % 1 === 0 ? p.total : p.total.toFixed(1);
-
-    return `
-      <div class="player-card">
-        <div class="card-header" onclick="toggleCard(${i})">
-          <div class="rank ${rankClass}">${rankSymbol}</div>
-          <div class="player-info">
-            <div class="player-name">${p.name}</div>
-            <div class="player-stats-meta">${p.totalMatchesPlayed} Matches Monitored</div>
-            <div class="team-chips">${chips}</div>
-          </div>
-          <div class="score-display">
-            <div class="score-big">${formattedTotal}</div>
-            <div class="score-label">Points</div>
-            <div class="expand-hint">Click to expand ▾</div>
-          </div>
-        </div>
-        <div class="card-breakdown" id="breakdown-${i}">
-          <div class="team-tabs">${teamTabs}</div>
-          ${teamPanels}
-        </div>
-      </div>`;
-  }).join('');
+        <div class="m-status ${sClass}">${sLabel}</div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
 }
 
-function renderUpcoming() {
-  const upcomingContent = document.getElementById('upcomingContent');
-  const liveSection = document.getElementById('liveFixturesSection');
-  const liveContent = document.getElementById('liveFixtures');
-  if (!upcomingContent) return;
+function renderLiveGrid() { renderMatchListGeneric('liveMatchContainer', m => m.status === 'LIVE' || m.status === 'FT'); }
+function renderUpcomingSchedule() { renderMatchListGeneric('upcomingContainer', m => m.status === 'upcoming'); }
+function renderResultsFeed() { renderMatchListGeneric('resultsContainer', m => m.status === 'FT'); }
 
-  const upcomingMatches = gameData.matches.filter(m => m.status === 'upcoming');
-  const liveMatches = gameData.matches.filter(m => m.status === 'LIVE');
+function renderMatrix() {
+  const content = document.getElementById('matrixContainer');
+  content.innerHTML = '';
 
-  if (liveMatches.length > 0 && liveSection && liveContent) {
-    liveSection.style.display = 'block';
-    liveContent.innerHTML = liveMatches.map(m => {
-      const homeOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.homeTeam))).map(p=>p.name);
-      const awayOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.awayTeam))).map(p=>p.name);
-      return `
-        <div class="live-fixture">
-          <div class="fixture-top">
-            <div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div>
-            <div class="fixture-score">${m.homeScore} – ${m.awayScore}</div>
-          </div>
-          <div class="fixture-meta">${m.stage} • Live Updates Running</div>
-          <div class="fixture-owners">
-            ${homeOwners.map(o => `<span class="owner-tag highlighted">${o} (${m.homeTeam})</span>`).join('')}
-            ${awayOwners.map(o => `<span class="owner-tag highlighted">${o} (${m.awayTeam})</span>`).join('')}
-          </div>
-        </div>`;
-    }).join('');
-  } else if (liveSection) {
-    liveSection.style.display = 'none';
-  }
+  let matrix = {};
+  let selfPlayPoints = {};
 
-  if (upcomingMatches.length === 0) {
-    upcomingContent.innerHTML = '<div class="empty-state"><div class="big">🎉</div>No upcoming games scheduled. Tournament concluded!</div>';
-    return;
-  }
-
-  const grouped = {};
-  upcomingMatches.forEach(m => {
-    let dateStr = "Scheduled Matches";
-    if (m.date) {
-      try { dateStr = new Date(m.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }); } catch(e){}
-    }
-    if (!grouped[dateStr]) grouped[dateStr] = [];
-    grouped[dateStr].push(m);
+  scoredPlayers.forEach(p => {
+    matrix[p.name] = {};
+    selfPlayPoints[p.name] = 0;
+    scoredPlayers.forEach(opp => { matrix[p.name][opp.name] = { points: 0, count: 0 }; });
   });
 
-  let html = '';
-  for (const date in grouped) {
-    html += `<div class="date-group-title">${date}</div>`;
-    html += grouped[date].map(m => {
-      const homeOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.homeTeam))).map(p=>p.name);
-      const awayOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.awayTeam))).map(p=>p.name);
-      let timeStr = "TBD";
-      if (m.date) {
-        try { timeStr = new Date(m.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch(e){}
-      }
-      return `
-        <div class="fixture-card">
-          <div class="fixture-top">
-            <div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div>
-            <div class="badge-up">${timeStr}</div>
-          </div>
-          <div class="fixture-meta">${m.stage}</div>
-          <div class="fixture-owners">
-            ${homeOwners.map(o => `<span class="owner-tag">${o} (${m.homeTeam})</span>`).join('')}
-            ${awayOwners.map(o => `<span class="owner-tag">${o} (${m.awayTeam})</span>`).join('')}
-          </div>
-        </div>`;
-    }).join('');
-  }
-  upcomingContent.innerHTML = html;
-}
-
-function renderH2H() {
-  const content = document.getElementById('h2hContent');
-  if (!content) return;
-
-  if (scoredPlayers.length < 2) {
-    content.innerHTML = '<div class="empty-state"><div class="big">⚔️</div>Add more players to generate matrix.</div>';
-    return;
-  }
-
-  const matrix = {};
-  scoredPlayers.forEach(p1 => {
-    matrix[p1.name] = {};
-    scoredPlayers.forEach(p2 => {
-      matrix[p1.name][p2.name] = { points: 0 };
-    });
-  });
-
-  const selfPlayPoints = {};
-  scoredPlayers.forEach(p => { selfPlayPoints[p.name] = 0; });
-
-  scoredPlayers.forEach(pRow => {
-    const rowNormTeams = pRow.teams.map(t => norm(t));
-
-    gameData.matches.forEach(m => {
-      if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null || isNaN(m.homeScore) || isNaN(m.awayScore)) return;
-
-      const hTeam = norm(m.homeTeam);
-      const aTeam = norm(m.awayTeam);
-      const rowHasHome = rowNormTeams.includes(hTeam);
-      const rowHasAway = rowNormTeams.includes(aTeam);
-
+  gameData.matches.forEach(m => {
+    if (m.status !== 'FT' && m.status !== 'LIVE') return;
+    scoredPlayers.forEach(pRow => {
+      const rowHasHome = pRow.breakdown.some(b => norm(b.team) === norm(m.homeTeam));
+      const rowHasAway = pRow.breakdown.some(b => norm(b.team) === norm(m.awayTeam));
       if (rowHasHome && rowHasAway) {
-        const homePts = getMatchPointsForTeam(m.homeTeam, m);
-        const awayPts = getMatchPointsForTeam(m.awayTeam, m);
-        selfPlayPoints[pRow.name] += (homePts + awayPts);
+        selfPlayPoints[pRow.name] += getMatchPointsForTeam(m.homeTeam, m);
+        selfPlayPoints[pRow.name] += getMatchPointsForTeam(m.awayTeam, m);
       }
-    });
+      scoredPlayers.forEach(pCol => {
+        if (pRow.name === pCol.name) return;
+        const colHasHome = pCol.breakdown.some(b => norm(b.team) === norm(m.homeTeam));
+        const colHasAway = pCol.breakdown.some(b => norm(b.team) === norm(m.awayTeam));
 
-    scoredPlayers.forEach(pCol => {
-      if (pRow.name === pCol.name) return; 
-      const colNormTeams = pCol.teams.map(t => norm(t));
-
-      gameData.matches.forEach(m => {
-        if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null || isNaN(m.homeScore) || isNaN(m.awayScore)) return;
-
-        const hTeam = norm(m.homeTeam);
-        const aTeam = norm(m.awayTeam);
-
-        const rowHasHome = rowNormTeams.includes(hTeam);
-        const rowHasAway = rowNormTeams.includes(aTeam);
-        const colHasHome = colNormTeams.includes(hTeam);
-        const colHasAway = colNormTeams.includes(aTeam);
-
-        if (rowHasHome && rowHasAway) return;
-        if (colHasHome && colHasAway) return;
+        if (!rowHasHome && !rowHasAway) return;
+        if (!colHasHome && !colHasAway) return;
+        if (rowHasHome && colHasHome) return;
+        if (rowHasAway && colHasAway) return;
 
         if (rowHasHome && colHasAway) {
           matrix[pRow.name][pCol.name].points += getMatchPointsForTeam(m.homeTeam, m);
@@ -1003,11 +654,20 @@ function renderH2H() {
 // ─── INITIALIZATION ──────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   if (loadState() && players.length >= 2) {
+    // Clear out the overlay fields layout to prevent background storage bloat
+    document.getElementById('playerInputs').innerHTML = '';
+    playerCount = 0;
+    
+    // Auto launch dashboard seamlessly
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    
     fetchAndUpdate();
     setInterval(fetchAndUpdate, 300000); 
   } else {
+    // Render standard layout for manual setups
+    document.getElementById('playerInputs').innerHTML = '';
+    playerCount = 0;
     addPlayerInput(); 
     addPlayerInput();
   }
