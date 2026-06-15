@@ -201,10 +201,7 @@
   th { background: var(--surface); font-weight: 600; color: var(--muted); letter-spacing: 0.5px; font-size: 0.75rem; }
   td { background: var(--card); }
   td.row-label { font-weight: 600; text-align: left; color: var(--text); background: var(--surface); white-space: nowrap; }
-  td.diagonal { background: var(--bg); color: var(--border); }
-  td.win-cell { color: var(--green); font-weight: 700; }
-  td.loss-cell { color: #ef4444; }
-  td.draw-cell { color: var(--muted); }
+  td.match-cell { color: var(--text); font-weight: 600; }
   .h2h-note { font-size: 0.75rem; color: var(--muted); margin-top: 12px; }
 
   /* SCORING LEGEND */
@@ -394,7 +391,7 @@
 
   <div class="tab-panel" id="tab-h2h">
     <div class="section-title">Head to Head Matrix</div>
-    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Points each player's teams have earned in matches where opponent's teams were also playing. Read row vs column.</p>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Points accumulated strictly when individual roster allocations directly collided with opponents on the pitch.</p>
     <div class="h2h-table-wrap" id="h2hContent">
       <div class="empty-state"><div class="big">⚔️</div>Loading...</div>
     </div>
@@ -475,12 +472,29 @@ function showSetup() {
   if (players.length === 0) { addPlayerInput(); addPlayerInput(); }
 }
 
-// ─── PERSISTENCE ──────────────────────────────────────────────────────────────
+// ─── PERSISTENCE (DYNAMIC URL PASSING ENGINE) ──────────────────────────────────
 function saveState() {
-  try { localStorage.setItem('wc26_players', JSON.stringify(players)); } catch(e){}
+  try { 
+    localStorage.setItem('wc26_players', JSON.stringify(players)); 
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify(players))));
+    const newUrl = window.location.origin + window.location.pathname + '?league=' + payload;
+    window.history.replaceState({ path: newUrl }, '', newUrl);
+  } catch(e){}
 }
+
 function loadState() {
   try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlLeague = urlParams.get('league');
+    if (urlLeague) {
+      const decodedData = decodeURIComponent(escape(atob(urlLeague)));
+      const parsedPlayers = JSON.parse(decodedData);
+      if (parsedPlayers && parsedPlayers.length >= 2) {
+        players = parsedPlayers;
+        try { localStorage.setItem('wc26_players', JSON.stringify(players)); } catch(e){}
+        return true;
+      }
+    }
     const saved = localStorage.getItem('wc26_players');
     if (saved) { players = JSON.parse(saved); return true; }
   } catch(e){}
@@ -494,13 +508,23 @@ function norm(s) {
   return t;
 }
 
-// ─── AUTOMATED CORROSION-RESISTANT API SYNC ──────────────────────────────────
+function setStatus(type, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (!dot || !txt) return;
+  dot.className = 'status-dot ' + type;
+  txt.textContent = text;
+}
+
+// ─── AUTOMATED API SYNC ───────────────────────────────────────────────────────
 async function fetchAndUpdate() {
   setStatus('loading', 'Connecting to tournament data streams via secure proxy...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
-  btn.disabled = true;
-  icon.classList.add('spin');
+  if (btn && icon) {
+    btn.disabled = true;
+    icon.classList.add('spin');
+  }
 
   const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
   const proxies = [
@@ -515,10 +539,8 @@ async function fetchAndUpdate() {
     try {
       const res = await fetch(proxy);
       if (!res.ok) continue;
-      
       const data = await res.json();
       rawMatches = typeof data.contents === 'string' ? JSON.parse(data.contents) : data;
-      
       if (rawMatches && Array.isArray(rawMatches)) break;
     } catch (e) {
       errorMsg = e.message;
@@ -532,14 +554,12 @@ async function fetchAndUpdate() {
         let homeS = m.HomeTeamScore;
         let awayS = m.AwayTeamScore;
 
-        // FORCE INJECT INTERCEPT FOR MATCHES ACTIVE RIGHT NOW (Belgium vs Egypt Context)
         if (norm(m.HomeTeam).includes('belgium') && norm(m.AwayTeam).includes('egypt')) {
           status = 'LIVE';
           homeS = 0;
           awayS = 1;
         }
 
-        // If a match is not explicitly handled above but contains scores, flag as Full Time
         if (status !== 'LIVE' && homeS !== null && awayS !== null) {
           status = 'FT'; 
         }
@@ -570,7 +590,6 @@ async function fetchAndUpdate() {
         goldenBoot: null, goalOfTournament: null, youngPlayer: null
       };
 
-      // Historic Injections
       const nedJpnMatch = gameData.matches.find(m => 
         (norm(m.homeTeam).includes('netherland') && norm(m.awayTeam).includes('japan')) ||
         (norm(m.homeTeam).includes('japan') && norm(m.awayTeam).includes('netherland'))
@@ -600,11 +619,48 @@ async function fetchAndUpdate() {
     renderAll();
   }
 
-  btn.disabled = false;
-  icon.classList.remove('spin');
+  if (btn && icon) {
+    btn.disabled = false;
+    icon.classList.remove('spin');
+  }
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
+function getMatchPointsForTeam(teamName, match) {
+  if (match.status === 'upcoming' || match.homeScore === null || match.awayScore === null) return 0;
+  
+  const tn = norm(teamName);
+  const isHome = norm(match.homeTeam) === tn;
+  const isAway = norm(match.awayTeam) === tn;
+  if (!isHome && !isAway) return 0;
+
+  const myScore = isHome ? match.homeScore : match.awayScore;
+  const oppScore = isHome ? match.awayScore : match.homeScore;
+  const margin = myScore - oppScore;
+  let matchPts = 0;
+  const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
+
+  if (match.aeT || match.status === 'AET') {
+    if (margin > 0) matchPts += 2;
+    else if (margin === 0) matchPts += 1;
+  } else if (match.status === 'PEN') {
+    if (margin >= 0) matchPts += 2;
+  } else {
+    if (margin > 0) matchPts += 3;
+    else if (margin === 0) matchPts += 1;
+  }
+
+  if (margin >= 3) matchPts += 1;
+  if (oppScore === 0 && myScore >= 0 && (margin >= 0 || match.status !== 'upcoming')) {
+    if (oppScore === 0 && outcome !== 'loss') matchPts += 0.5;
+  }
+
+  const rc = (match.redCards?.[isHome ? 'homeTeam' : 'awayTeam']) || 0;
+  if (rc > 0) matchPts -= rc;
+
+  return matchPts;
+}
+
 function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goalOfTournament, youngPlayer) {
   const tn = norm(teamName);
   let score = 0;
@@ -618,34 +674,27 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
     if (!isHome && !isAway) continue;
 
     matchCount++;
-
     const myScore = isHome ? m.homeScore : m.awayScore;
     const oppScore = isHome ? m.awayScore : m.homeScore;
     const oppTeam = isHome ? m.awayTeam : m.homeTeam;
     const margin = myScore - oppScore;
-    let matchPts = 0;
-    const matchEvents = [];
     const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
-
-    // Live matches earn temporary points on the leaderboard
+    
+    // Track localized visual event strings for breakdown dashboard rendering
+    const matchEvents = [];
     if (m.aeT || m.status === 'AET') {
-      if (margin > 0) { matchPts += 2; matchEvents.push('Win AET +2'); }
-      else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
+      if (margin > 0) matchEvents.push('Win AET +2'); else if (margin === 0) matchEvents.push('Draw +1');
     } else if (m.status === 'PEN') {
-      if (margin >= 0) { matchPts += 2; matchEvents.push('Win (pens) +2'); }
+      if (margin >= 0) matchEvents.push('Win (pens) +2');
     } else {
-      if (margin > 0) { matchPts += 3; matchEvents.push(`Win +3`); }
-      else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
+      if (margin > 0) matchEvents.push(`Win +3`); else if (margin === 0) matchEvents.push('Draw +1');
     }
-
-    if (margin >= 3) { matchPts += 1; matchEvents.push('3+ goal margin +1'); }
-    if (oppScore === 0 && myScore >= 0 && (margin >= 0 || m.status !== 'upcoming')) {
-      if (oppScore === 0 && outcome !== 'loss') { matchPts += 0.5; matchEvents.push('Clean sheet +0.5'); }
-    }
-
+    if (margin >= 3) matchEvents.push('3+ goal margin +1');
+    if (oppScore === 0 && outcome !== 'loss') matchEvents.push('Clean sheet +0.5');
     const rc = (m.redCards?.[isHome ? 'homeTeam' : 'awayTeam']) || 0;
-    if (rc > 0) { matchPts -= rc; matchEvents.push(`Red card ×${rc} -${rc}`); }
+    if (rc > 0) matchEvents.push(`Red card ×${rc} -${rc}`);
 
+    const matchPts = getMatchPointsForTeam(teamName, m);
     score += matchPts;
     matchDetails.push({ match: m, oppTeam, myScore, oppScore, outcome, pts: matchPts, events: matchEvents });
   }
@@ -682,8 +731,40 @@ function renderAll() {
   renderH2H();
 }
 
+function openTeamTab(event, pIdx, tIdx) {
+  event.stopPropagation();
+  const breakdownDiv = document.getElementById(`breakdown-${pIdx}`);
+  if (!breakdownDiv) return;
+  const isCurrentlyOpen = breakdownDiv.classList.contains('open');
+  
+  document.querySelectorAll('.card-breakdown').forEach(el => el.classList.remove('open'));
+  
+  if (!isCurrentlyOpen) {
+    breakdownDiv.classList.add('open');
+    switchTeamTab(pIdx, tIdx);
+  }
+}
+
+function switchTeamTab(pIdx, tIdx) {
+  const card = document.getElementById(`breakdown-${pIdx}`);
+  if (!card) return;
+  card.querySelectorAll('.team-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === tIdx);
+  });
+  card.querySelectorAll('.team-detail').forEach((panel, i) => {
+    panel.style.display = i === tIdx ? 'block' : 'none';
+  });
+}
+
+function toggleCard(pIdx) {
+  const breakdownDiv = document.getElementById(`breakdown-${pIdx}`);
+  if (breakdownDiv) breakdownDiv.classList.toggle('open');
+}
+
 function renderLeaderboard() {
   const lb = document.getElementById('leaderboardContent');
+  if (!lb) return;
+  
   lb.innerHTML = scoredPlayers.map((p, i) => {
     const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'other';
     const rankSymbol = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
@@ -719,151 +800,116 @@ function renderLeaderboard() {
       const totalStr = t.score % 1 === 0 ? t.score : t.score.toFixed(1);
       return `<div class="team-detail" id="tpanel-${i}-${ti}" style="display:${ti===0?'block':'none'}">
         <div class="team-detail-header">
-          <div>
-            <div class="team-detail-name">${t.team}</div>
-            <div style="font-size:0.72rem;color:var(--muted)">${t.matchDetails.length} match(es) running/completed</div>
-          </div>
-          <div class="team-detail-score">${totalStr > 0 ? '+' : ''}${totalStr} pts</div>
+          <span class="team-detail-name">${t.team} Overview</span>
+          <span class="team-detail-score">${totalStr} pts</span>
         </div>
         <div class="detail-rows">
-          ${matchRows || '<div style="color:var(--muted);font-size:0.8rem">Waiting on fixture to kick off...</div>'}
+          ${matchRows || '<div class="detail-row"><span class="dr-label">Matches Played</span><span class="dr-val">0</span></div>'}
           ${bonusRows}
         </div>
       </div>`;
     }).join('');
 
+    const formattedTotal = p.total % 1 === 0 ? p.total : p.total.toFixed(1);
+
     return `
-    <div class="player-card" style="animation-delay:${i*0.06}s">
-      <div class="card-header" onclick="toggleBreakdown(${i})">
-        <div class="rank ${rankClass}">${rankSymbol}</div>
-        <div class="player-info">
-          <div class="player-name">${p.name}</div>
-          <div class="player-stats-meta">📊 Total matches tracking: <strong>${p.totalMatchesPlayed}</strong></div>
-          <div class="team-chips">${chips}</div>
+      <div class="player-card">
+        <div class="card-header" onclick="toggleCard(${i})">
+          <div class="rank ${rankClass}">${rankSymbol}</div>
+          <div class="player-info">
+            <div class="player-name">${p.name}</div>
+            <div class="player-stats-meta">${p.totalMatchesPlayed} Matches Monitored</div>
+            <div class="team-chips">${chips}</div>
+          </div>
+          <div class="score-display">
+            <div class="score-big">${formattedTotal}</div>
+            <div class="score-label">Points</div>
+            <div class="expand-hint">Click to expand ▾</div>
+          </div>
         </div>
-        <div class="score-display">
-          <div class="score-big">${p.total % 1 === 0 ? p.total : p.total.toFixed(1)}</div>
-          <div class="score-label">points</div>
-          <div class="expand-hint">▼ expand</div>
+        <div class="card-breakdown" id="breakdown-${i}">
+          <div class="team-tabs">${teamTabs}</div>
+          ${teamPanels}
         </div>
-      </div>
-      <div class="card-breakdown" id="breakdown-${i}">
-        <div class="team-tabs">${teamTabs}</div>
-        ${teamPanels}
-      </div>
-    </div>`;
+      </div>`;
   }).join('');
 }
 
-function toggleBreakdown(i) {
-  const el = document.getElementById(`breakdown-${i}`);
-  el.classList.toggle('open');
-  const card = el.previousElementSibling;
-  const hint = card?.querySelector('.expand-hint');
-  if (hint) hint.textContent = el.classList.contains('open') ? '▲ collapse' : '▼ expand';
-}
-
-function openTeamTab(e, playerIdx, teamIdx) {
-  e.stopPropagation();
-  const bd = document.getElementById(`breakdown-${playerIdx}`);
-  bd.classList.add('open');
-  switchTeamTab(playerIdx, teamIdx);
-  const hint = bd.previousElementSibling?.querySelector('.expand-hint');
-  if (hint) hint.textContent = '▲ collapse';
-}
-
-function switchTeamTab(playerIdx, teamIdx) {
-  const p = scoredPlayers[playerIdx];
-  p.teamBreakdown.forEach((_,ti) => {
-    document.getElementById(`ttab-${playerIdx}-${ti}`)?.classList.toggle('active', ti===teamIdx);
-    const panel = document.getElementById('tpanel-' + playerIdx + '-' + ti);
-    if (panel) panel.style.display = ti===teamIdx ? 'block' : 'none';
-  });
-}
-
-// ─── UPCOMING / LIVE MATRIX ──────────────────────────────────────────────────
 function renderUpcoming() {
-  const { matches=[] } = gameData;
-  const teamOwners = {};
-  players.forEach(p => p.teams.forEach(t => {
-    if (!teamOwners[norm(t)]) teamOwners[norm(t)] = [];
-    teamOwners[norm(t)].push(p.name);
-  }));
-
-  function getOwners(teamName) { return teamOwners[norm(teamName)] || []; }
-
-  // Extract Live matches
-  const live = matches.filter(m => m.status === 'LIVE');
+  const upcomingContent = document.getElementById('upcomingContent');
   const liveSection = document.getElementById('liveFixturesSection');
-  const liveContainer = document.getElementById('liveFixtures');
-  
-  if (live.length > 0) {
+  const liveContent = document.getElementById('liveFixtures');
+  if (!upcomingContent) return;
+
+  const upcomingMatches = gameData.matches.filter(m => m.status === 'upcoming');
+  const liveMatches = gameData.matches.filter(m => m.status === 'LIVE');
+
+  if (liveMatches.length > 0 && liveSection && liveContent) {
     liveSection.style.display = 'block';
-    liveContainer.innerHTML = live.map(m => {
-      const hOwners = getOwners(m.homeTeam);
-      const aOwners = getOwners(m.awayTeam);
-      return `<div class="live-fixture" style="border-left: 4px solid var(--accent2)">
-        <div class="fixture-top">
-          <div>
-            <div class="fixture-teams" style="color:#fff; font-weight:700">${m.homeTeam} vs ${m.awayTeam}</div>
-            <div style="font-size:0.7rem; color:var(--accent); margin-top:2px">Match In Progress</div>
+    liveContent.innerHTML = liveMatches.map(m => {
+      const homeOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.homeTeam))).map(p=>p.name);
+      const awayOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.awayTeam))).map(p=>p.name);
+      return `
+        <div class="live-fixture">
+          <div class="fixture-top">
+            <div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div>
+            <div class="fixture-score">${m.homeScore} – ${m.awayScore}</div>
           </div>
-          <div class="fixture-score" style="color:var(--accent2); font-size:1.6rem">${m.homeScore ?? 0} – ${m.awayScore ?? 0}</div>
-        </div>
-        <div class="fixture-owners" style="margin-top:8px">
-          ${hOwners.map(o=>`<span class="owner-tag highlighted" style="border-color:var(--accent2)">👤 ${o} (${m.homeTeam})</span>`).join('')}
-          ${aOwners.map(o=>`<span class="owner-tag highlighted" style="border-color:var(--accent2)">👤 ${o} (${m.awayTeam})</span>`).join('')}
-        </div>
-      </div>`;
+          <div class="fixture-meta">${m.stage} • Live Updates Running</div>
+          <div class="fixture-owners">
+            ${homeOwners.map(o => `<span class="owner-tag highlighted">${o} (${m.homeTeam})</span>`).join('')}
+            ${awayOwners.map(o => `<span class="owner-tag highlighted">${o} (${m.awayTeam})</span>`).join('')}
+          </div>
+        </div>`;
     }).join('');
-  } else {
+  } else if (liveSection) {
     liveSection.style.display = 'none';
   }
 
-  // Handle true Upcoming Scheduled items
-  const upcoming = matches
-    .filter(m => m.status === 'upcoming')
-    .sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
-
-  if (upcoming.length === 0) {
-    document.getElementById('upcomingContent').innerHTML = `<div class="empty-state">No upcoming tournament fixtures scheduled for today.</div>`;
+  if (upcomingMatches.length === 0) {
+    upcomingContent.innerHTML = '<div class="empty-state"><div class="big">🎉</div>No upcoming games scheduled. Tournament concluded!</div>';
     return;
   }
 
-  const byDate = {};
-  upcoming.forEach(m => {
-    const d = m.date ? new Date(m.date).toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long'}) : 'Date Pending';
-    if (!byDate[d]) byDate[d] = [];
-    byDate[d].push(m);
+  // Sort upcoming fixtures chronologically by parsing date flags
+  const grouped = {};
+  upcomingMatches.forEach(m => {
+    let dateStr = "Scheduled Matches";
+    if (m.date) {
+      try { dateStr = new Date(m.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }); } catch(e){}
+    }
+    if (!grouped[dateStr]) grouped[dateStr] = [];
+    grouped[dateStr].push(m);
   });
 
   let html = '';
-  for (const [date, fixtures] of Object.entries(byDate)) {
+  for (const date in grouped) {
     html += `<div class="date-group-title">${date}</div>`;
-    fixtures.forEach(m => {
-      const homeOwners = getOwners(m.homeTeam);
-      const awayOwners = getOwners(m.awayTeam);
-      const allOwners = [...new Set([...homeOwners,...awayOwners])];
-      const time = m.date ? new Date(m.date).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
-      html += `<div class="fixture-card">
-        <div class="fixture-top">
-          <div>
+    html += grouped[date].map(m => {
+      const homeOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.homeTeam))).map(p=>p.name);
+      const awayOwners = players.filter(p => p.teams.map(t=>norm(t)).includes(norm(m.awayTeam))).map(p=>p.name);
+      let timeStr = "TBD";
+      if (m.date) {
+        try { timeStr = new Date(m.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch(e){}
+      }
+      return `
+        <div class="fixture-card">
+          <div class="fixture-top">
             <div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div>
-            <div class="fixture-meta">${m.stage||''} ${time ? '· ' + time : ''}</div>
+            <div class="badge-up">${timeStr}</div>
           </div>
-          <span class="badge-up">Scheduled</span>
-        </div>
-        ${allOwners.length > 0 ? `<div class="fixture-owners">
-          ${homeOwners.map(o=>`<span class="owner-tag highlighted">👤 ${o} (${m.homeTeam})</span>`).join('')}
-          ${awayOwners.map(o=>`<span class="owner-tag highlighted">👤 ${o} (${m.awayTeam})</span>`).join('')}
-        </div>` : ''}
-      </div>`;
-    });
+          <div class="fixture-meta">${m.stage}</div>
+          <div class="fixture-owners">
+            ${homeOwners.map(o => `<span class="owner-tag">${o} (${m.homeTeam})</span>`).join('')}
+            ${awayOwners.map(o => `<span class="owner-tag">${o} (${m.awayTeam})</span>`).join('')}
+          </div>
+        </div>`;
+    }).join('');
   }
-  document.getElementById('upcomingContent').innerHTML = html;
+  upcomingContent.innerHTML = html;
 }
 
-// ─── HEAD TO HEAD MATRIX ─────────────────────────────────────────────────────
+// ─── LEADERBOARD-CONSISTENT HEAD TO HEAD MATRIX ENGINE ───────────────────────
 function renderH2H() {
   const content = document.getElementById('h2hContent');
   if (!content) return;
@@ -873,45 +919,37 @@ function renderH2H() {
     return;
   }
 
-  // 1. Initialize empty head-to-head tracking matrix
   const matrix = {};
   scoredPlayers.forEach(p1 => {
     matrix[p1.name] = {};
     scoredPlayers.forEach(p2 => {
-      matrix[p1.name][p2.name] = { points: 0, wins: 0, losses: 0 };
+      matrix[p1.name][p2.name] = { points: 0 };
     });
   });
 
-  // Track points earned when a player's own teams play each other
   const selfPlayPoints = {};
   scoredPlayers.forEach(p => { selfPlayPoints[p.name] = 0; });
 
-  // 2. Compute records by checking every player match combination
   scoredPlayers.forEach(pRow => {
     const rowNormTeams = pRow.teams.map(t => norm(t));
 
-    // Calculate Points when Row Player's own teams face each other
+    // Calculate Points strictly when Row Player's own roster teams face each other
     gameData.matches.forEach(m => {
       if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) return;
 
       const hTeam = norm(m.homeTeam);
       const aTeam = norm(m.awayTeam);
-
       const rowHasHome = rowNormTeams.includes(hTeam);
       const rowHasAway = rowNormTeams.includes(aTeam);
 
       if (rowHasHome && rowHasAway) {
-        if (m.homeScore > m.awayScore) {
-          selfPlayPoints[pRow.name] += 3; 
-        } else if (m.homeScore < m.awayScore) {
-          selfPlayPoints[pRow.name] += 3; 
-        } else {
-          selfPlayPoints[pRow.name] += 2; 
-        }
+        const homePts = getMatchPointsForTeam(m.homeTeam, m);
+        const awayPts = getMatchPointsForTeam(m.awayTeam, m);
+        selfPlayPoints[pRow.name] += (homePts + awayPts);
       }
     });
 
-    // Calculate standard Head-to-Head against OTHER managers
+    // Calculate standard Head-to-Head points variance against OTHER managers
     scoredPlayers.forEach(pCol => {
       if (pRow.name === pCol.name) return; 
       const colNormTeams = pCol.teams.map(t => norm(t));
@@ -930,45 +968,29 @@ function renderH2H() {
         if (rowHasHome && rowHasAway) return;
         if (colHasHome && colHasAway) return;
 
-        if ((rowHasHome && colHasAway) || (rowHasAway && colHasHome)) {
-          const rowIsHome = rowHasHome;
-          const rowScore = rowIsHome ? m.homeScore : m.awayScore;
-          const colScore = rowIsHome ? m.awayScore : m.homeScore;
-
-          if (rowScore > colScore) {
-            matrix[pRow.name][pCol.name].points += 3;
-            matrix[pRow.name][pCol.name].wins++;
-          } else if (rowScore < colScore) {
-            matrix[pRow.name][pCol.name].losses++;
-          } else {
-            matrix[pRow.name][pCol.name].points += 1;
-          }
+        if (rowHasHome && colHasAway) {
+          matrix[pRow.name][pCol.name].points += getMatchPointsForTeam(m.homeTeam, m);
+        }
+        if (rowHasAway && colHasHome) {
+          matrix[pRow.name][pCol.name].points += getMatchPointsForTeam(m.awayTeam, m);
         }
       });
     });
   });
 
-  // 3. Render the computed matrix into a standard HTML table layout
   let html = `<table><thead><tr><th>Player vs Opponent</th>`;
-  scoredPlayers.forEach(p => {
-    html += `<th>${p.name}</th>`;
-  });
+  scoredPlayers.forEach(p => { html += `<th>${p.name}</th>`; });
   html += `</tr></thead><tbody>`;
 
   scoredPlayers.forEach(pRow => {
     html += `<tr><td class="row-label">${pRow.name}</td>`;
     scoredPlayers.forEach(pCol => {
-      if (pRow.name === pCol.name) {
-        const selfPts = selfPlayPoints[pRow.name];
-        html += `<td class="draw-cell"><strong>${selfPts} pts</strong></td>`;
-      } else {
-        const cell = matrix[pRow.name][pCol.name];
-        let cellClass = 'draw-cell';
-        if (cell.wins > cell.losses) cellClass = 'win-cell';
-        if (cell.losses > cell.wins) cellClass = 'loss-cell';
+      const displayPts = (pRow.name === pCol.name) 
+        ? selfPlayPoints[pRow.name] 
+        : matrix[pRow.name][pCol.name].points;
 
-        html += `<td class="${cellClass}"><strong>${cell.points} pts</strong></td>`;
-      }
+      const formattedPts = displayPts % 1 === 0 ? displayPts : displayPts.toFixed(1);
+      html += `<td class="match-cell"><strong>${formattedPts} pts</strong></td>`;
     });
     html += `</tr>`;
   });
@@ -976,22 +998,17 @@ function renderH2H() {
   html += `</tbody></table>`;
   content.innerHTML = html;
 }
-  
-function setStatus(state, msg) {
-  const dot = document.getElementById('statusDot');
-  dot.className = 'status-dot' + (state==='loading'?' loading':state==='error'?' error':'');
-  document.getElementById('statusText').textContent = msg;
-}
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+// ─── INITIALIZATION ──────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   if (loadState() && players.length >= 2) {
-    players.forEach(p => addPlayerInput(p.name, [...p.teams,'','','','','',''].slice(0,6)));
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     fetchAndUpdate();
+    setInterval(fetchAndUpdate, 300000); // Continuous auto-sync every 5 minutes
   } else {
-    addPlayerInput(); addPlayerInput();
+    addPlayerInput(); 
+    addPlayerInput();
   }
 });
 </script>
