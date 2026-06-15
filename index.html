@@ -865,59 +865,100 @@ function renderUpcoming() {
 
 // ─── HEAD TO HEAD MATRIX ─────────────────────────────────────────────────────
 function renderH2H() {
-  if (scoredPlayers.length < 2) return;
-  const { matches=[] } = gameData;
-  const n = scoredPlayers.length;
-  const matrix = Array.from({length:n}, () => Array(n).fill(0));
+  const content = document.getElementById('h2hContent');
+  if (!content) return;
 
-  scoredPlayers.forEach((pA, iA) => {
-    scoredPlayers.forEach((pB, iB) => {
-      if (iA === iB) return;
-      let pts = 0;
-      pA.teams.forEach(tA => {
-        pB.teams.forEach(tB => {
-          matches.forEach(m => {
-            if (m.status === 'upcoming' || m.homeScore === null) return;
-            const htA = norm(m.homeTeam) === norm(tA) && norm(m.awayTeam) === norm(tB);
-            const atA = norm(m.awayTeam) === norm(tA) && norm(m.homeTeam) === norm(tB);
-            if (!htA && !atA) return;
-            const isHome = htA;
-            const myScore = isHome ? m.homeScore : m.awayScore;
-            const oppScore = isHome ? m.awayScore : m.homeScore;
-            const margin = myScore - oppScore;
-            if (margin > 0) pts += 3;
-            else if (margin === 0) pts += 1;
-            if (margin >= 3) pts += 1;
-            if (oppScore === 0) pts += 0.5;
-            const rc = (m.redCards?.[isHome?'homeTeam':'awayTeam'])||0;
-            pts -= rc;
-          });
-        });
+  if (scoredPlayers.length < 2) {
+    content.innerHTML = '<div class="empty-state"><div class="big">⚔️</div>Add more players to generate matrix.</div>';
+    return;
+  }
+
+  // 1. Initialize empty head-to-head tracking matrix
+  const matrix = {};
+  scoredPlayers.forEach(p1 => {
+    matrix[p1.name] = {};
+    scoredPlayers.forEach(p2 => {
+      matrix[p1.name][p2.name] = { wins: 0, losses: 0, draws: 0, points: 0 };
+    });
+  });
+
+  // 2. Compute records by checking every player match combination
+  scoredPlayers.forEach(pRow => {
+    const rowNormTeams = pRow.teams.map(t => norm(t));
+
+    scoredPlayers.forEach(pCol => {
+      if (pRow.name === pCol.name) return; // Skip comparing a player against themselves in the grid
+      const colNormTeams = pCol.teams.map(t => norm(t));
+
+      // Scan all tournament matches
+      gameData.matches.forEach(m => {
+        if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) return;
+
+        const hTeam = norm(m.homeTeam);
+        const aTeam = norm(m.awayTeam);
+
+        // Check ownership anchors
+        const rowHasHome = rowNormTeams.includes(hTeam);
+        const rowHasAway = rowNormTeams.includes(aTeam);
+        const colHasHome = colNormTeams.includes(hTeam);
+        const colHasAway = colNormTeams.includes(aTeam);
+
+        // 🛠️ SELF-PLAY FIX: Skip if the row player owns BOTH teams on the field
+        if (rowHasHome && rowHasAway) return;
+        // 🛠️ SELF-PLAY FIX: Skip if the column player owns BOTH teams on the field
+        if (colHasHome && colHasAway) return;
+
+        // Verify if this is a direct match between a team owned by pRow and a team owned by pCol
+        if ((rowHasHome && colHasAway) || (rowHasAway && colHasHome)) {
+          const rowIsHome = rowHasHome;
+          const rowScore = rowIsHome ? m.homeScore : m.awayScore;
+          const colScore = rowIsHome ? m.awayScore : m.homeScore;
+
+          // Allocate records based on match variance
+          if (rowScore > colScore) {
+            matrix[pRow.name][pCol.name].wins++;
+            matrix[pRow.name][pCol.name].points += 3;
+          } else if (rowScore < colScore) {
+            matrix[pRow.name][pCol.name].losses++;
+          } else {
+            matrix[pRow.name][pCol.name].draws++;
+            matrix[pRow.name][pCol.name].points += 1;
+          }
+        }
       });
-      matrix[iA][iB] = pts;
     });
   });
 
-  let html = `<table><thead><tr><th>↓ vs →</th>`;
-  scoredPlayers.forEach(p => { html += `<th>${p.name}</th>`; });
-  html += `<th>Total</th></tr></thead><tbody>`;
-
-  scoredPlayers.forEach((pA, iA) => {
-    const rowTotal = matrix[iA].reduce((s,v)=>s+v,0);
-    html += `<tr><td class="row-label">${pA.name}</td>`;
-    scoredPlayers.forEach((pB, iB) => {
-      if (iA === iB) { html += `<td class="diagonal">—</td>`; return; }
-      const v = matrix[iA][iB];
-      const vs = matrix[iB][iA];
-      const cls = v > vs ? 'win-cell' : v < vs ? 'loss-cell' : 'draw-cell';
-      html += `<td class="${cls}">${v>0?'+':''}${v.toFixed(1)}</td>`;
-    });
-    html += `<td style="font-weight:700;color:var(--accent)">+${rowTotal.toFixed(1)}</td></tr>`;
+  // 3. Render the computed matrix into a scannable HTML table layout
+  let html = `<table><thead><tr><th>Player vs Opponent</th>`;
+  scoredPlayers.forEach(p => {
+    html += `<th>${p.name}</th>`;
   });
+  html += `</tr></thead><tbody>`;
+
+  scoredPlayers.forEach(pRow => {
+    html += `<tr><td class="row-label">${pRow.name}</td>`;
+    scoredPlayers.forEach(pCol => {
+      if (pRow.name === pCol.name) {
+        html += `<td class="diagonal">—</td>`;
+      } else {
+        const cell = matrix[pRow.name][pCol.name];
+        let cellClass = 'draw-cell';
+        if (cell.wins > cell.losses) cellClass = 'win-cell';
+        if (cell.losses > cell.wins) cellClass = 'loss-cell';
+
+        html += `<td class="${cellClass}">
+          <strong>${cell.points} pts</strong><br>
+          <small style="font-size:0.68rem;color:var(--muted)">${cell.wins}W-${cell.draws}D-${cell.losses}L</small>
+        </td>`;
+      }
+    });
+    html += `</tr>`;
+  });
+
   html += `</tbody></table>`;
-  document.getElementById('h2hContent').innerHTML = html;
+  content.innerHTML = html;
 }
-
 function setStatus(state, msg) {
   const dot = document.getElementById('statusDot');
   dot.className = 'status-dot' + (state==='loading'?' loading':state==='error'?' error':'');
