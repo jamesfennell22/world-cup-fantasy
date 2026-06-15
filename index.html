@@ -887,7 +887,7 @@ function renderH2H() {
     const rowNormTeams = pRow.teams.map(t => norm(t));
 
     scoredPlayers.forEach(pCol => {
-      if (pRow.name === pCol.name) return; // Skip comparing a player against themselves in the grid
+      if (pRow.name === pCol.name) return; // Skip standard H2H loop if matching against themselves
       const colNormTeams = pCol.teams.map(t => norm(t));
 
       // Scan all tournament matches
@@ -903,18 +903,16 @@ function renderH2H() {
         const colHasHome = colNormTeams.includes(hTeam);
         const colHasAway = colNormTeams.includes(aTeam);
 
-        // 🛠️ SELF-PLAY FIX: Skip if the row player owns BOTH teams on the field
+        // SELF-PLAY FIX: Skip if either player owns BOTH teams on the field
         if (rowHasHome && rowHasAway) return;
-        // 🛠️ SELF-PLAY FIX: Skip if the column player owns BOTH teams on the field
         if (colHasHome && colHasAway) return;
 
-        // Verify if this is a direct match between a team owned by pRow and a team owned by pCol
+        // Verify direct match between a team owned by pRow and a team owned by pCol
         if ((rowHasHome && colHasAway) || (rowHasAway && colHasHome)) {
           const rowIsHome = rowHasHome;
           const rowScore = rowIsHome ? m.homeScore : m.awayScore;
           const colScore = rowIsHome ? m.awayScore : m.homeScore;
 
-          // Allocate records based on match variance
           if (rowScore > colScore) {
             matrix[pRow.name][pCol.name].wins++;
             matrix[pRow.name][pCol.name].points += 3;
@@ -940,7 +938,12 @@ function renderH2H() {
     html += `<tr><td class="row-label">${pRow.name}</td>`;
     scoredPlayers.forEach(pCol => {
       if (pRow.name === pCol.name) {
-        html += `<td class="diagonal">—</td>`;
+        // 🛠️ FIX: Instead of a blank dash, display the player's total global score
+        const totalPts = pRow.total % 1 === 0 ? pRow.total : pRow.total.toFixed(1);
+        html += `<td class="diagonal" style="background: rgba(245,166,35,0.1); color: var(--accent); font-weight: bold;">
+          ${totalPts} pts<br>
+          <small style="font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px">Total</small>
+        </td>`;
       } else {
         const cell = matrix[pRow.name][pCol.name];
         let cellClass = 'draw-cell';
@@ -959,6 +962,7 @@ function renderH2H() {
   html += `</tbody></table>`;
   content.innerHTML = html;
 }
+  
 function setStatus(state, msg) {
   const dot = document.getElementById('statusDot');
   dot.className = 'status-dot' + (state==='loading'?' loading':state==='error'?' error':'');
