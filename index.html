@@ -562,12 +562,12 @@ async function fetchAndUpdate() {
           }
         }
 
-        // Keep testing override for verification
-        if (norm(m.HomeTeam).includes('belgium') && norm(m.AwayTeam).includes('egypt')) {
-          status = 'LIVE';
-          homeS = 0;
-          awayS = 1;
-        }
+        // // Keep testing override for verification
+        // if (norm(m.HomeTeam).includes('belgium') && norm(m.AwayTeam).includes('egypt')) {
+        //   status = 'LIVE';
+        //   homeS = 0;
+        //   awayS = 1;
+        // }
         
         let homeRed = 0, awayRed = 0;
         if (norm(m.HomeTeam) === 'mexico') homeRed = 1;
