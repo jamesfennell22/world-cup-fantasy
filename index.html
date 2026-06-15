@@ -492,76 +492,96 @@ function norm(s) {
   return t;
 }
 
-// ─── AUTOMATED DIRECT API SYNC ────────────────────────────────────────────────
+// ─── AUTOMATED CORROSION-RESISTANT API SYNC ──────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Connecting directly to tournament data streams...');
+  setStatus('loading', 'Connecting to tournament data streams via secure proxy...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   btn.disabled = true;
   icon.classList.add('spin');
 
-  try {
-    // Calling the data feed directly bypassed the third party CORS proxy block
-    const res = await fetch('https://fixturedownload.com/feed/json/fifa-world-cup-2026');
-    if (!res.ok) throw new Error(`Server returned status: ${res.status}`);
-    
-    const rawMatches = await res.json();
+  const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
+  const proxies = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+  ];
 
-    const convertedMatches = rawMatches.map(m => {
-      let status = 'upcoming';
-      if (m.HomeTeamScore !== null && m.AwayTeamScore !== null) {
-        status = 'FT'; 
-      }
+  let rawMatches = null;
+  let errorMsg = '';
+
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy);
+      if (!res.ok) continue;
       
-      let homeRed = 0, awayRed = 0;
-      if (norm(m.HomeTeam) === 'mexico') homeRed = 1;
-      if (norm(m.AwayTeam) === 'south africa') awayRed = 2;
-
-      return {
-        homeTeam: m.HomeTeam,
-        awayTeam: m.AwayTeam,
-        homeScore: m.HomeTeamScore,
-        awayScore: m.AwayTeamScore,
-        status: status,
-        stage: m.Group || "Knockout Stage",
-        date: m.DateUtc,
-        redCards: { homeTeam: homeRed, awayTeam: awayRed },
-        aeT: false
-      };
-    });
-
-    gameData = {
-      lastUpdated: new Date().toISOString(),
-      matches: convertedMatches,
-      qualified: [],
-      eliminated: [],
-      goldenBootScorers: [],
-      goldenBoot: null, goalOfTournament: null, youngPlayer: null
-    };
-
-    const nedJpnMatch = gameData.matches.find(m => 
-      (norm(m.homeTeam).includes('netherland') && norm(m.awayTeam).includes('japan')) ||
-      (norm(m.homeTeam).includes('japan') && norm(m.awayTeam).includes('netherland'))
-    );
-    if (nedJpnMatch) {
-      nedJpnMatch.homeScore = 2;
-      nedJpnMatch.awayScore = 2;
-      nedJpnMatch.status = 'FT';
+      const data = await res.json();
+      rawMatches = typeof data.contents === 'string' ? JSON.parse(data.contents) : data;
+      
+      if (rawMatches && Array.isArray(rawMatches)) break;
+    } catch (e) {
+      errorMsg = e.message;
     }
+  }
 
-    buildScoredPlayers();
-    renderAll();
-    
-    document.getElementById('app').style.display = 'block';
-    
-    const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
-    setStatus('ok', `Synchronized live feed • Updated ${new Date().toLocaleTimeString()}`);
-    document.getElementById('headerSub').textContent = `${ftCount} matches compiled successfully`;
+  if (rawMatches && Array.isArray(rawMatches)) {
+    try {
+      const convertedMatches = rawMatches.map(m => {
+        let status = 'upcoming';
+        if (m.HomeTeamScore !== null && m.AwayTeamScore !== null) {
+          status = 'FT'; 
+        }
+        
+        let homeRed = 0, awayRed = 0;
+        if (norm(m.HomeTeam) === 'mexico') homeRed = 1;
+        if (norm(m.AwayTeam) === 'south africa') awayRed = 2;
 
-  } catch(e) {
-    console.error(e);
-    setStatus('error', `Offline Mode: Using cached tournament stats. (${e.message})`);
-    
+        return {
+          homeTeam: m.HomeTeam,
+          awayTeam: m.AwayTeam,
+          homeScore: m.HomeTeamScore,
+          awayScore: m.AwayTeamScore,
+          status: status,
+          stage: m.Group || "Knockout Stage",
+          date: m.DateUtc,
+          redCards: { homeTeam: homeRed, awayTeam: awayRed },
+          aeT: false
+        };
+      });
+
+      gameData = {
+        lastUpdated: new Date().toISOString(),
+        matches: convertedMatches,
+        qualified: [],
+        eliminated: [],
+        goldenBootScorers: [],
+        goldenBoot: null, goalOfTournament: null, youngPlayer: null
+      };
+
+      const nedJpnMatch = gameData.matches.find(m => 
+        (norm(m.homeTeam).includes('netherland') && norm(m.awayTeam).includes('japan')) ||
+        (norm(m.homeTeam).includes('japan') && norm(m.awayTeam).includes('netherland'))
+      );
+      if (nedJpnMatch) {
+        nedJpnMatch.homeScore = 2;
+        nedJpnMatch.awayScore = 2;
+        nedJpnMatch.status = 'FT';
+      }
+
+      buildScoredPlayers();
+      renderAll();
+      
+      document.getElementById('app').style.display = 'block';
+      
+      const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
+      setStatus('ok', `Synchronized live feed • Updated ${new Date().toLocaleTimeString()}`);
+      document.getElementById('headerSub').textContent = `${ftCount} matches compiled successfully`;
+
+    } catch(err) {
+      console.error(err);
+      setStatus('error', `Data parsing failure: ${err.message}`);
+    }
+  } else {
+    setStatus('error', `Offline Mode: Server request blocked or timed out. (${errorMsg || 'CORS Restriction'})`);
     document.getElementById('app').style.display = 'block';
     document.getElementById('headerSub').textContent = 'Local Cache Mode';
     
