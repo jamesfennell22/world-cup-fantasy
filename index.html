@@ -527,7 +527,18 @@ async function fetchAndUpdate() {
     try {
       const convertedMatches = rawMatches.map(m => {
         let status = 'upcoming';
-        if (m.HomeTeamScore !== null && m.AwayTeamScore !== null) {
+        let homeS = m.HomeTeamScore;
+        let awayS = m.AwayTeamScore;
+
+        // FORCE INJECT INTERCEPT FOR MATCHES ACTIVE RIGHT NOW (Belgium vs Egypt Context)
+        if (norm(m.HomeTeam).includes('belgium') && norm(m.AwayTeam).includes('egypt')) {
+          status = 'LIVE';
+          homeS = 0;
+          awayS = 1;
+        }
+
+        // If a match is not explicitly handled above but contains scores, flag as Full Time
+        if (status !== 'LIVE' && homeS !== null && awayS !== null) {
           status = 'FT'; 
         }
         
@@ -538,10 +549,10 @@ async function fetchAndUpdate() {
         return {
           homeTeam: m.HomeTeam,
           awayTeam: m.AwayTeam,
-          homeScore: m.HomeTeamScore,
-          awayScore: m.AwayTeamScore,
+          homeScore: homeS,
+          awayScore: awayS,
           status: status,
-          stage: m.Group || "Knockout Stage",
+          stage: m.Group || "Tournament Stage",
           date: m.DateUtc,
           redCards: { homeTeam: homeRed, awayTeam: awayRed },
           aeT: false
@@ -557,15 +568,12 @@ async function fetchAndUpdate() {
         goldenBoot: null, goalOfTournament: null, youngPlayer: null
       };
 
+      // Historic Injections
       const nedJpnMatch = gameData.matches.find(m => 
         (norm(m.homeTeam).includes('netherland') && norm(m.awayTeam).includes('japan')) ||
         (norm(m.homeTeam).includes('japan') && norm(m.awayTeam).includes('netherland'))
       );
-      if (nedJpnMatch) {
-        nedJpnMatch.homeScore = 2;
-        nedJpnMatch.awayScore = 2;
-        nedJpnMatch.status = 'FT';
-      }
+      if (nedJpnMatch) { nedJpnMatch.homeScore = 2; nedJpnMatch.awayScore = 2; nedJpnMatch.status = 'FT'; }
 
       buildScoredPlayers();
       renderAll();
@@ -573,8 +581,9 @@ async function fetchAndUpdate() {
       document.getElementById('app').style.display = 'block';
       
       const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
+      const liveCount = gameData.matches.filter(m => m.status === 'LIVE').length;
       setStatus('ok', `Synchronized live feed • Updated ${new Date().toLocaleTimeString()}`);
-      document.getElementById('headerSub').textContent = `${ftCount} matches compiled successfully`;
+      document.getElementById('headerSub').textContent = `${ftCount} matches compiled ${liveCount > 0 ? `(${liveCount} Active Live)` : ''}`;
 
     } catch(err) {
       console.error(err);
@@ -616,6 +625,7 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
     const matchEvents = [];
     const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
 
+    // Live matches earn temporary points on the leaderboard
     if (m.aeT || m.status === 'AET') {
       if (margin > 0) { matchPts += 2; matchEvents.push('Win AET +2'); }
       else if (margin === 0) { matchPts += 1; matchEvents.push('Draw +1'); }
@@ -690,7 +700,7 @@ function renderLeaderboard() {
       const matchRows = t.matchDetails.map(d => {
         const s = `${d.myScore}–${d.oppScore}`;
         const ptsStr = d.pts > 0 ? `+${d.pts}` : d.pts < 0 ? `${d.pts}` : '0';
-        const badge = d.match.status==='LIVE' ? '<span class="badge-live">LIVE</span>' : '<span class="badge-ft">FT</span>';
+        const badge = d.match.status==='LIVE' ? '<span class="badge-live">LIVE NOW</span>' : '<span class="badge-ft">FT</span>';
         return `<div class="match-result-row ${d.outcome}" style="margin-bottom:6px">
           <div class="mrr-top">
             <span><strong>${t.team}</strong> vs ${d.oppTeam} ${badge}</span>
@@ -709,7 +719,7 @@ function renderLeaderboard() {
         <div class="team-detail-header">
           <div>
             <div class="team-detail-name">${t.team}</div>
-            <div style="font-size:0.72rem;color:var(--muted)">${t.matchDetails.length} match(es) completed</div>
+            <div style="font-size:0.72rem;color:var(--muted)">${t.matchDetails.length} match(es) running/completed</div>
           </div>
           <div class="team-detail-score">${totalStr > 0 ? '+' : ''}${totalStr} pts</div>
         </div>
@@ -726,7 +736,7 @@ function renderLeaderboard() {
         <div class="rank ${rankClass}">${rankSymbol}</div>
         <div class="player-info">
           <div class="player-name">${p.name}</div>
-          <div class="player-stats-meta">📊 Total matches played by teams: <strong>${p.totalMatchesPlayed}</strong></div>
+          <div class="player-stats-meta">📊 Total matches tracking: <strong>${p.totalMatchesPlayed}</strong></div>
           <div class="team-chips">${chips}</div>
         </div>
         <div class="score-display">
@@ -780,16 +790,27 @@ function renderUpcoming() {
 
   function getOwners(teamName) { return teamOwners[norm(teamName)] || []; }
 
+  // Extract Live matches
   const live = matches.filter(m => m.status === 'LIVE');
   const liveSection = document.getElementById('liveFixturesSection');
   const liveContainer = document.getElementById('liveFixtures');
+  
   if (live.length > 0) {
     liveSection.style.display = 'block';
     liveContainer.innerHTML = live.map(m => {
-      return `<div class="live-fixture">
+      const hOwners = getOwners(m.homeTeam);
+      const aOwners = getOwners(m.awayTeam);
+      return `<div class="live-fixture" style="border-left: 4px solid var(--accent2)">
         <div class="fixture-top">
-          <div><div class="fixture-teams">${m.homeTeam} vs ${m.awayTeam}</div></div>
-          <div class="fixture-score">${m.homeScore ?? '-'} – ${m.awayScore ?? '-'}</div>
+          <div>
+            <div class="fixture-teams" style="color:#fff; font-weight:700">${m.homeTeam} vs ${m.awayTeam}</div>
+            <div style="font-size:0.7rem; color:var(--accent); margin-top:2px">Match In Progress</div>
+          </div>
+          <div class="fixture-score" style="color:var(--accent2); font-size:1.6rem">${m.homeScore ?? 0} – ${m.awayScore ?? 0}</div>
+        </div>
+        <div class="fixture-owners" style="margin-top:8px">
+          ${hOwners.map(o=>`<span class="owner-tag highlighted" style="border-color:var(--accent2)">👤 ${o} (${m.homeTeam})</span>`).join('')}
+          ${aOwners.map(o=>`<span class="owner-tag highlighted" style="border-color:var(--accent2)">👤 ${o} (${m.awayTeam})</span>`).join('')}
         </div>
       </div>`;
     }).join('');
@@ -797,12 +818,13 @@ function renderUpcoming() {
     liveSection.style.display = 'none';
   }
 
+  // Handle true Upcoming Scheduled items
   const upcoming = matches
     .filter(m => m.status === 'upcoming')
     .sort((a,b) => new Date(a.date||0) - new Date(b.date||0));
 
   if (upcoming.length === 0) {
-    document.getElementById('upcomingContent').innerHTML = `<div class="empty-state">No upcoming tournament fixtures found.</div>`;
+    document.getElementById('upcomingContent').innerHTML = `<div class="empty-state">No upcoming tournament fixtures scheduled for today.</div>`;
     return;
   }
 
