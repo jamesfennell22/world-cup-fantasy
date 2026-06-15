@@ -882,7 +882,7 @@ function renderH2H() {
     });
   });
 
-  // Track points earned from internal "Self-Play" matchups (e.g., Canada vs Bosnia)
+  // Track points earned when a player's own teams play each other
   const selfPlayPoints = {};
   scoredPlayers.forEach(p => { selfPlayPoints[p.name] = 0; });
 
@@ -890,7 +890,7 @@ function renderH2H() {
   scoredPlayers.forEach(pRow => {
     const rowNormTeams = pRow.teams.map(t => norm(t));
 
-    // Calculate Self-Play Points First (When Row Player's own teams face each other)
+    // Calculate Points when Row Player's own teams face each other
     gameData.matches.forEach(m => {
       if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) return;
 
@@ -900,15 +900,13 @@ function renderH2H() {
       const rowHasHome = rowNormTeams.includes(hTeam);
       const rowHasAway = rowNormTeams.includes(aTeam);
 
-      // 💥 SELF-PLAY MATCH DETECTED (e.g., Canada vs Bosnia owned by same person)
       if (rowHasHome && rowHasAway) {
-        // Calculate points based on standard match variance logic
         if (m.homeScore > m.awayScore) {
-          selfPlayPoints[pRow.name] += 3; // Home team wins
+          selfPlayPoints[pRow.name] += 3; 
         } else if (m.homeScore < m.awayScore) {
-          selfPlayPoints[pRow.name] += 3; // Away team wins
+          selfPlayPoints[pRow.name] += 3; 
         } else {
-          selfPlayPoints[pRow.name] += 2; // Draw (1 point to each team = 2 total points)
+          selfPlayPoints[pRow.name] += 2; // 1 point to each team = 2 total
         }
       }
     });
@@ -929,7 +927,7 @@ function renderH2H() {
         const colHasHome = colNormTeams.includes(hTeam);
         const colHasAway = colNormTeams.includes(aTeam);
 
-        // Skip if either player owns BOTH teams (handled by our selfPlay calculations)
+        // Skip if either player owns BOTH teams (handled by internal tracking loop above)
         if (rowHasHome && rowHasAway) return;
         if (colHasHome && colHasAway) return;
 
@@ -953,7 +951,7 @@ function renderH2H() {
     });
   });
 
-  // 3. Render the computed matrix into a HTML table layout
+  // 3. Render the computed matrix into a standard HTML table layout
   let html = `<table><thead><tr><th>Player vs Opponent</th>`;
   scoredPlayers.forEach(p => {
     html += `<th>${p.name}</th>`;
@@ -964,11 +962,10 @@ function renderH2H() {
     html += `<tr><td class="row-label">${pRow.name}</td>`;
     scoredPlayers.forEach(pCol => {
       if (pRow.name === pCol.name) {
-        // Displays the actual points won strictly from internal conflict matches
+        // Blends smoothly into the table grid with identical default cell formatting
         const selfPts = selfPlayPoints[pRow.name];
-        html += `<td class="diagonal" style="background: rgba(220, 53, 69, 0.1); color: #dc3545; font-weight: bold; border: 1px dashed rgba(220, 53, 69, 0.3);">
-          +${selfPts} pts<br>
-          <small style="font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px">Self-Play</small>
+        html += `<td class="draw-cell">
+          <strong>${selfPts} pts</strong>
         </td>`;
       } else {
         const cell = matrix[pRow.name][pCol.name];
