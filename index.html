@@ -327,7 +327,7 @@
 <div class="setup-overlay" id="setupOverlay">
   <div class="setup-panel">
     <h2>⚽ Fantasy World Cup 2026</h2>
-    <p>Enter each player's name and their 6 national teams. Scores are loaded securely from your repository data file.</p>
+    <p>Enter each player's name and their 6 national teams. Scores are synced automatically from live data feed.</p>
     <div id="playerInputs"></div>
     <button class="add-player-btn" onclick="addPlayerInput()">+ Add another player</button>
     <button class="start-btn" onclick="startDashboard()">LAUNCH DASHBOARD</button>
@@ -341,7 +341,7 @@
         <div class="trophy-icon">🏆</div>
         <div>
           <h1>Fantasy World Cup 2026</h1>
-          <p id="headerSub">Connecting to local data source...</p>
+          <p id="headerSub">Connecting to feed...</p>
         </div>
       </div>
       <div class="header-actions">
@@ -446,7 +446,7 @@ function removePlayer(id) { document.getElementById(`prow-${id}`)?.remove(); }
 function startDashboard() {
   players = [];
   for (let i = 1; i <= playerCount; i++) {
-    const nameEl = document.getElementById('pname-' + i);
+    const nameEl = document.getElementById(`pname-${i}`);
     if (!nameEl) continue;
     const name = nameEl.value.trim();
     if (!name) continue;
@@ -472,7 +472,7 @@ function showSetup() {
   if (players.length === 0) { addPlayerInput(); addPlayerInput(); }
 }
 
-// ─── PERSISTENCE (DYNAMIC URL PASSING ENGINE) ──────────────────────────────────
+// ─── PERSISTENCE (DYNAMIC URL SHARE PASSING ENGINE) ───────────────────────────
 function saveState() {
   try { 
     localStorage.setItem('wc26_players', JSON.stringify(players)); 
@@ -517,9 +517,9 @@ function setStatus(type, text) {
   txt.textContent = text;
 }
 
-// ─── BULLETPROOF REPOSITORY DATA FETCHING ─────────────────────────────────────
+// ─── AUTOMATED LIVE COR-FREE API DATA STREAM ─────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Loading data securely from repository matches.json...');
+  setStatus('loading', 'Streaming tournament matches directly from live feed...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn && icon) {
@@ -527,14 +527,20 @@ async function fetchAndUpdate() {
     icon.classList.add('spin');
   }
 
+  const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
+  const liveProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
   let rawMatches = null;
   let errorMsg = '';
 
   try {
-    // Fetches the matches.json sitting natively on your GitHub Pages repo
-    const res = await fetch('./matches.json');
-    if (!res.ok) throw new Error('matches.json missing from repository directory');
-    rawMatches = await res.json();
+    const res = await fetch(liveProxy);
+    if (!res.ok) throw new Error(`HTTP network response code: ${res.status}`);
+    
+    const wrapper = await res.json();
+    if (wrapper && wrapper.contents) {
+      rawMatches = typeof wrapper.contents === 'string' ? JSON.parse(wrapper.contents) : wrapper.contents;
+    }
   } catch (e) {
     errorMsg = e.message;
   }
@@ -595,7 +601,7 @@ async function fetchAndUpdate() {
       
       const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
       const liveCount = gameData.matches.filter(m => m.status === 'LIVE').length;
-      setStatus('ok', `Synchronized with repo copy • Updated ${new Date().toLocaleTimeString()}`);
+      setStatus('ok', `Synchronized live feed • Updated ${new Date().toLocaleTimeString()}`);
       document.getElementById('headerSub').textContent = `${ftCount} matches compiled ${liveCount > 0 ? `(${liveCount} Active Live)` : ''}`;
 
     } catch(err) {
@@ -603,9 +609,9 @@ async function fetchAndUpdate() {
       setStatus('error', `Data parsing failure: ${err.message}`);
     }
   } else {
-    setStatus('error', `Data Error: ${errorMsg}`);
+    setStatus('error', `Offline Feed Mode: (${errorMsg || 'Server Restricted'})`);
     document.getElementById('app').style.display = 'block';
-    document.getElementById('headerSub').textContent = 'Repository File Error';
+    document.getElementById('headerSub').textContent = 'Live Synced Cache Failure';
     
     buildScoredPlayers();
     renderAll();
@@ -736,6 +742,7 @@ function openTeamTab(event, pIdx, tIdx) {
   }
 }
 
+// Ensure layout functions map index targets cleanly across rendering
 function switchTeamTab(pIdx, tIdx) {
   const card = document.getElementById(`breakdown-${pIdx}`);
   if (!card) return;
@@ -993,7 +1000,7 @@ window.addEventListener('load', () => {
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     fetchAndUpdate();
-    setInterval(fetchAndUpdate, 300000); 
+    setInterval(fetchAndUpdate, 300000); // Continuous data syncing layer
   } else {
     addPlayerInput(); 
     addPlayerInput();
