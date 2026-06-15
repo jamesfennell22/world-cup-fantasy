@@ -327,7 +327,7 @@
 <div class="setup-overlay" id="setupOverlay">
   <div class="setup-panel">
     <h2>⚽ Fantasy World Cup 2026</h2>
-    <p>Enter each player's name and their 6 national teams. Scores are synced automatically from live data feed.</p>
+    <p>Enter each player's name and their 6 national teams. Scores are loaded securely from your repository data file.</p>
     <div id="playerInputs"></div>
     <button class="add-player-btn" onclick="addPlayerInput()">+ Add another player</button>
     <button class="start-btn" onclick="startDashboard()">LAUNCH DASHBOARD</button>
@@ -341,7 +341,7 @@
         <div class="trophy-icon">🏆</div>
         <div>
           <h1>Fantasy World Cup 2026</h1>
-          <p id="headerSub">Connecting to feed...</p>
+          <p id="headerSub">Connecting to local data source...</p>
         </div>
       </div>
       <div class="header-actions">
@@ -446,7 +446,7 @@ function removePlayer(id) { document.getElementById(`prow-${id}`)?.remove(); }
 function startDashboard() {
   players = [];
   for (let i = 1; i <= playerCount; i++) {
-    const nameEl = document.getElementById(`pname-${i}`);
+    const nameEl = document.getElementById('pname-' + i);
     if (!nameEl) continue;
     const name = nameEl.value.trim();
     if (!name) continue;
@@ -501,11 +501,11 @@ function loadState() {
   return false;
 }
 
-// ─── UTILS ────────────────────────────────────────────────────────────────────
+// ─── UTILS & SPELLING NORMALIZATION ───────────────────────────────────────────
 function norm(s) { 
   let t = (s||'').toLowerCase().trim();
   if (t === "côte d'ivoire") return "ivory coast";
-  if (t === "turkey" || t === "türkiye") return "turkey"; // <-- Add this line
+  if (t === "turkey" || t === "türkiye") return "turkey";
   return t;
 }
 
@@ -517,9 +517,9 @@ function setStatus(type, text) {
   txt.textContent = text;
 }
 
-// ─── AUTOMATED API SYNC ───────────────────────────────────────────────────────
+// ─── BULLETPROOF REPOSITORY DATA FETCHING ─────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Connecting to tournament data streams...');
+  setStatus('loading', 'Loading data securely from repository matches.json...');
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn && icon) {
@@ -527,29 +527,16 @@ async function fetchAndUpdate() {
     icon.classList.add('spin');
   }
 
-  // Primary URL using a modern cross-origin optimized mirror endpoint
-  const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
-  
-  // Array of formatted endpoints matching exactly what each server expects
-  const proxies = [
-    `https://api.codetabs.com/v1/proxy?quest=${targetUrl}`, // No encoding required here
-    `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
-  ];
-
   let rawMatches = null;
   let errorMsg = '';
 
-  for (const proxy of proxies) {
-    try {
-      const res = await fetch(proxy);
-      if (!res.ok) continue;
-      const data = await res.json();
-      // CodeTabs returns the raw JSON string/array directly
-      rawMatches = typeof data === 'string' ? JSON.parse(data) : data;
-      if (rawMatches && Array.isArray(rawMatches)) break;
-    } catch (e) {
-      errorMsg = e.message;
-    }
+  try {
+    // Fetches the matches.json sitting natively on your GitHub Pages repo
+    const res = await fetch('./matches.json');
+    if (!res.ok) throw new Error('matches.json missing from repository directory');
+    rawMatches = await res.json();
+  } catch (e) {
+    errorMsg = e.message;
   }
 
   if (rawMatches && Array.isArray(rawMatches)) {
@@ -608,7 +595,7 @@ async function fetchAndUpdate() {
       
       const ftCount = gameData.matches.filter(m => m.status === 'FT').length;
       const liveCount = gameData.matches.filter(m => m.status === 'LIVE').length;
-      setStatus('ok', `Synchronized live feed • Updated ${new Date().toLocaleTimeString()}`);
+      setStatus('ok', `Synchronized with repo copy • Updated ${new Date().toLocaleTimeString()}`);
       document.getElementById('headerSub').textContent = `${ftCount} matches compiled ${liveCount > 0 ? `(${liveCount} Active Live)` : ''}`;
 
     } catch(err) {
@@ -616,9 +603,9 @@ async function fetchAndUpdate() {
       setStatus('error', `Data parsing failure: ${err.message}`);
     }
   } else {
-    setStatus('error', `Offline Mode: Feed servers busy. (${errorMsg || 'CORS Restricting'})`);
+    setStatus('error', `Data Error: ${errorMsg}`);
     document.getElementById('app').style.display = 'block';
-    document.getElementById('headerSub').textContent = 'Local Cache Mode';
+    document.getElementById('headerSub').textContent = 'Repository File Error';
     
     buildScoredPlayers();
     renderAll();
@@ -685,7 +672,6 @@ function calcTeamScore(teamName, matches, qualified, eliminated, goldenBoot, goa
     const margin = myScore - oppScore;
     const outcome = margin > 0 ? 'win' : margin < 0 ? 'loss' : 'draw';
     
-    // Track localized visual event strings for breakdown dashboard rendering
     const matchEvents = [];
     if (m.aeT || m.status === 'AET') {
       if (margin > 0) matchEvents.push('Win AET +2'); else if (margin === 0) matchEvents.push('Draw +1');
@@ -823,7 +809,7 @@ function renderLeaderboard() {
           <div class="rank ${rankClass}">${rankSymbol}</div>
           <div class="player-info">
             <div class="player-name">${p.name}</div>
-            <div class="player-stats-meta">${p.totalMatchesPlayed} Matches Played</div>
+            <div class="player-stats-meta">${p.totalMatchesPlayed} Matches Monitored</div>
             <div class="team-chips">${chips}</div>
           </div>
           <div class="score-display">
@@ -876,7 +862,6 @@ function renderUpcoming() {
     return;
   }
 
-  // Sort upcoming fixtures chronologically by parsing date flags
   const grouped = {};
   upcomingMatches.forEach(m => {
     let dateStr = "Scheduled Matches";
@@ -938,7 +923,6 @@ function renderH2H() {
   scoredPlayers.forEach(pRow => {
     const rowNormTeams = pRow.teams.map(t => norm(t));
 
-    // Calculate Points strictly when Row Player's own roster teams face each other
     gameData.matches.forEach(m => {
       if (m.status === 'upcoming' || m.homeScore === null || m.awayScore === null) return;
 
@@ -954,7 +938,6 @@ function renderH2H() {
       }
     });
 
-    // Calculate standard Head-to-Head points variance against OTHER managers
     scoredPlayers.forEach(pCol => {
       if (pRow.name === pCol.name) return; 
       const colNormTeams = pCol.teams.map(t => norm(t));
@@ -1010,7 +993,7 @@ window.addEventListener('load', () => {
     document.getElementById('setupOverlay').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     fetchAndUpdate();
-    setInterval(fetchAndUpdate, 300000); // Continuous auto-sync every 5 minutes
+    setInterval(fetchAndUpdate, 300000); 
   } else {
     addPlayerInput(); 
     addPlayerInput();
