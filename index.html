@@ -529,8 +529,10 @@ async function fetchAndUpdate() {
 
   // Primary URL using a modern cross-origin optimized mirror endpoint
   const targetUrl = 'https://fixturedownload.com/feed/json/fifa-world-cup-2026';
+  
+  // Array of formatted endpoints matching exactly what each server expects
   const proxies = [
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${targetUrl}`, // No encoding required here
     `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
   ];
 
