@@ -150,7 +150,6 @@
 </head>
 <body>
 
-<!-- Setup overlay -->
 <div id="setupOverlay" class="overlay">
   <div class="setup-container">
     <div class="setup-header">
@@ -180,7 +179,6 @@
   <option value="Uruguay"><option value="Uzbekistan"><option value="Curacao">
 </datalist>
 
-<!-- Main app -->
 <div id="app" style="display:none;">
   <header>
     <h1>World Cup Fantasy 2026</h1>
@@ -210,7 +208,6 @@
       <button class="tab-btn"        onclick="switchTab(event,'rulesTab')">Rules</button>
     </nav>
 
-    <!-- League Table -->
     <div id="leaderboardTab" class="tab-content active">
       <div class="grid">
         <div class="card">
@@ -224,7 +221,6 @@
       </div>
     </div>
 
-    <!-- Matches (live first, then upcoming) -->
     <div id="matchesTab" class="tab-content">
       <div class="card">
         <div class="card-title">Matches</div>
@@ -232,7 +228,6 @@
       </div>
     </div>
 
-    <!-- Results -->
     <div id="resultsTab" class="tab-content">
       <div class="card">
         <div class="card-title">Results</div>
@@ -240,7 +235,6 @@
       </div>
     </div>
 
-    <!-- Head-to-Head -->
     <div id="matrixTab" class="tab-content">
       <div class="card">
         <div class="card-title">Head-to-Head Matrix</div>
@@ -249,7 +243,6 @@
       </div>
     </div>
 
-    <!-- Rules -->
     <div id="rulesTab" class="tab-content">
       <div class="card">
         <div class="card-title">Scoring Rules</div>
@@ -274,7 +267,6 @@
   </div>
 </div>
 
-<!-- Team detail modal -->
 <div id="teamModal" class="modal-backdrop" style="display:none;" onclick="closeModalOnBackdrop(event)">
   <div class="modal">
     <div class="modal-header">
@@ -298,19 +290,18 @@ let gameData      = { matches: [], qualified: [], goldenBoot: null, goalOfTourna
 let scoredPlayers = [];
 let playerCount   = 0;
 
-// Upgraded normalizer to strip spaces, hyphens, and connecting words like 'and' or '&'
 function norm(t) { 
   if (!t) return '';
   return t.trim()
           .toLowerCase()
-          .replace(/\band\b/g, '')  // Remove standalone word 'and'
-          .replace(/&/g, '')        // Remove ampersands
-          .replace(/[^a-z0-9]/g, ''); // Strip all remaining spaces, hyphens, or punctuation
+          .replace(/\band\b/g, '')
+          .replace(/&/g, '')
+          .replace(/[^a-z0-9]/g, '');
 }
 
 function saveState() {
-  localStorage.setItem('wcf_players', JSON.stringify(players));
   const payload = btoa(JSON.stringify(players));
+  localStorage.setItem('wcf_players', JSON.stringify(players));
   history.pushState({}, '', location.pathname + '?league=' + payload);
 }
 
@@ -427,17 +418,13 @@ async function fetchAndUpdate() {
 
         const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
 
-        let homeRed = 0, awayRed = 0;
-        (m.bookings || []).forEach(b => {
-          if (b.card === 'RED' || b.card === 'YELLOW_RED') {
-            if (b.team?.id === m.homeTeam?.id) homeRed++;
-            else if (b.team?.id === m.awayTeam?.id) awayRed++;
-          }
-        });
-
         const stageLabel = m.group
           ? m.group.replace('GROUP_', 'Group ')
           : (m.stage || '').replace(/_/g, ' ');
+
+        // EXTRACT CUSTOM RED CARD PAYLOAD ATTACHED BY THE UPDATED CLOUDFLARE WORKER
+        const homeRed = m.customRedCards?.home || 0;
+        const awayRed = m.customRedCards?.away || 0;
 
         return {
           homeTeam: m.homeTeam?.name || 'TBD',
@@ -482,7 +469,7 @@ function getMatchPointsForTeam(teamName, m) {
 
   const self   = isHome ? m.homeScore : m.awayScore;
   const opp    = isHome ? m.awayScore : m.homeScore;
-  const redCds = isHome ? m.redCards.home : m.redCards.away;
+  const redCds = isHome ? (m.redCards?.home || 0) : (m.redCards?.away || 0);
 
   let pts = 0;
   if (self > opp) {
@@ -496,7 +483,6 @@ function getMatchPointsForTeam(teamName, m) {
   return pts;
 }
 
-// Returns a human-readable breakdown of how points were earned in a match
 function getMatchPointsBreakdown(teamName, m) {
   const isHome = norm(m.homeTeam) === norm(teamName);
   const isAway = norm(m.awayTeam) === norm(teamName);
@@ -505,7 +491,7 @@ function getMatchPointsBreakdown(teamName, m) {
 
   const self   = isHome ? m.homeScore : m.awayScore;
   const opp    = isHome ? m.awayScore : m.homeScore;
-  const redCds = isHome ? m.redCards.home : m.redCards.away;
+  const redCds = isHome ? (m.redCards?.home || 0) : (m.redCards?.away || 0);
   const opp_name = isHome ? m.awayTeam : m.homeTeam;
   const parts  = [];
   let pts = 0;
@@ -549,7 +535,6 @@ function buildScoredPlayers() {
   scoredPlayers.sort((a, b) => b.total - a.total);
 }
 
-// Returns which players own a given team name
 function getOwners(teamName) {
   return scoredPlayers.filter(p => p.breakdown.some(b => norm(b.team) === norm(teamName)));
 }
@@ -590,7 +575,6 @@ function openTeamModal(teamName, ownerName) {
       listEl.appendChild(row);
     });
 
-    // Bonus rows
     const bonuses = [];
     gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) bonuses.push({ label: 'Qualified from group', pts: 0.5 }); });
     if (norm(gameData.goldenBoot)       === norm(teamName)) bonuses.push({ label: 'Golden Boot', pts: 1 });
@@ -703,7 +687,6 @@ function renderLiveRecent() {
     c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No matches yet.</div>';
     return;
   }
-  // Live first, then most recent finished
   const live     = list.filter(m => m.status === 'live');
   const finished = list.filter(m => m.status === 'finished').slice(-5).reverse();
   [...live, ...finished].forEach(m => c.appendChild(buildMatchCard(m, false)));
@@ -753,7 +736,6 @@ function renderResults() {
     c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No results yet.</div>';
     return;
   }
-  // Most recent first
   [...list].reverse().forEach(m => c.appendChild(buildMatchCard(m, true)));
 }
 
