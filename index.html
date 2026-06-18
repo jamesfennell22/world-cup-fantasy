@@ -391,73 +391,67 @@ function formatDate(utc) {
 
 // ── FETCH ─────────────────────────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Fetching live data...');
-  const btn  = document.getElementById('refreshBtn');
-  const icon = document.getElementById('refreshIcon');
-  if (btn)  btn.disabled = true;
-  if (icon) icon.classList.add('spin');
-
-  let parsed = null;
-  let errMsg = '';
-
   try {
-    const res = await fetch(WORKER_URL);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    parsed = await res.json();
-  } catch(e) { errMsg = e.message; }
-
-  if (parsed && parsed.matches) {
+    // 1. Fetch the main schedule and scores from your Cloudflare worker
+    const response = await fetch('YOUR_CLOUDFLARE_WORKER_URL');
+    const data = await response.json();
+    
+    // 2. Fetch the detailed open-source tournament events timeline 
+    let eventMap = {};
     try {
-      const converted = parsed.matches.map(m => {
-        const homeScore = m.score?.fullTime?.home ?? null;
-        const awayScore = m.score?.fullTime?.away ?? null;
-
-        let status = 'scheduled';
-        if      (m.status === 'FINISHED')                           status = 'finished';
-        else if (m.status === 'IN_PLAY' || m.status === 'PAUSED')  status = 'live';
-
-        const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
-
-        const stageLabel = m.group
-          ? m.group.replace('GROUP_', 'Group ')
-          : (m.stage || '').replace(/_/g, ' ');
-
-        // EXTRACT CUSTOM RED CARD PAYLOAD ATTACHED BY THE UPDATED CLOUDFLARE WORKER
-        const homeRed = m.customRedCards?.home || 0;
-        const awayRed = m.customRedCards?.away || 0;
-
-        return {
-          homeTeam: m.homeTeam?.name || 'TBD',
-          awayTeam: m.awayTeam?.name || 'TBD',
-          homeScore, awayScore, status, aeT: isAeT,
-          stage: stageLabel, date: m.utcDate,
-          redCards: { home: homeRed, away: awayRed }
-        };
-      });
-
-      gameData = { ...gameData, matches: converted, lastUpdated: new Date().toISOString() };
-      buildScoredPlayers();
-      renderAll();
-
-      const ft   = converted.filter(m => m.status === 'finished').length;
-      const live = converted.filter(m => m.status === 'live').length;
-      setStatus('ok', 'Updated ' + new Date().toLocaleTimeString());
-      document.getElementById('headerSub').textContent =
-        ft + ' matches completed' + (live ? ' · ' + live + ' live' : '');
-
-    } catch(err) {
-      console.error(err);
-      setStatus('error', 'Parse error: ' + err.message);
+      const eventResponse = await fetch('https://worldcup-json-2026.fly.dev/matches');
+      if (eventResponse.ok) {
+        const eventsData = await eventResponse.json();
+        // Index card events by mapping team names to their card counts
+        eventsData.forEach(match => {
+          const homeName = match.home_team?.name?.toLowerCase();
+          const awayName = match.away_team?.name?.toLowerCase();
+          
+          if (homeName && awayName) {
+            const homeRed = (match.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+            const awayRed = (match.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+            
+            // Unique key combining team pairings to perfectly match your main payload
+            eventMap[`${homeName}-${awayName}`] = { homeRed, awayRed };
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("Could not load external cards feed, falling back.", err);
     }
-  } else {
-    setStatus('error', 'Could not load data (' + (errMsg || 'unknown') + ')');
-    document.getElementById('headerSub').textContent = 'Live data unavailable';
-    buildScoredPlayers();
-    renderAll();
-  }
 
-  if (btn)  btn.disabled = false;
-  if (icon) icon.classList.remove('spin');
+    // 3. Process and merge both datasets
+    const converted = data.matches.map(m => {
+      const homeScore = m.score?.fullTime?.home ?? null;
+      const awayScore = m.score?.fullTime?.away ?? null;
+
+      let status = 'scheduled';
+      if      (m.status === 'FINISHED')                          status = 'finished';
+      else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') status = 'live';
+
+      const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
+      const stageLabel = m.group ? m.group.replace('GROUP_', 'Group ') : (m.stage || '').replace(/_/g, ' ');
+
+      // Automatically pair and retrieve red cards tracked by our event mapping
+      const homeKey = (m.homeTeam?.name || '').toLowerCase();
+      const awayKey = (m.awayTeam?.name || '').toLowerCase();
+      const cardData = eventMap[`${homeKey}-${awayKey}`] || { homeRed: 0, awayRed: 0 };
+
+      return {
+        homeTeam: m.homeTeam?.name || 'TBD',
+        awayTeam: m.awayTeam?.name || 'TBD',
+        homeScore, awayScore, status, aeT: isAeT,
+        stage: stageLabel, date: m.utcDate,
+        redCards: { home: cardData.homeRed, away: cardData.awayRed }
+      };
+    });
+
+    // Run your existing render functions using the newly mapped 'converted' data array here...
+    // e.g., renderDashboard(converted);
+
+  } catch (error) {
+    console.error("Dashboard update failed:", error);
+  }
 }
 
 // ── SCORING ───────────────────────────────────────────────────────────────────
