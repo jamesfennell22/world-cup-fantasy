@@ -205,7 +205,7 @@
       <button class="tab-btn"        onclick="switchTab(event,'matchesTab')">Matches</button>
       <button class="tab-btn"        onclick="switchTab(event,'resultsTab')">Results</button>
       <button class="tab-btn"        onclick="switchTab(event,'matrixTab')">Head-to-Head</button>
-      <button class="tab-btn"        onclick="switchTab(event,'rulesTab')">Rules</button>
+      <button class="tab-btn"        onclick="rulesTabTab(event,'rulesTab')">Rules</button>
     </nav>
 
     <div id="leaderboardTab" class="tab-content active">
@@ -280,9 +280,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const API_KEY           = '01c0a0cdc86a441aa5c96ac0f075b184';
-const WC_COMPETITION_ID = 2000;
-const WORKER_URL        = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
+const WORKER_URL = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let players       = [];
@@ -329,6 +327,10 @@ function switchTab(e, id) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   e.currentTarget.classList.add('active');
   document.getElementById(id).classList.add('active');
+}
+
+function rulesTabTab(e, id) {
+  switchTab(e, id);
 }
 
 function addPlayerInput(ex = null) {
@@ -389,69 +391,97 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-// ── FETCH ─────────────────────────────────────────────────────────────────────
+// ── FETCH & AUTONOMOUS EVENTS MERGING ─────────────────────────────────────────
 async function fetchAndUpdate() {
+  setStatus('loading', 'Fetching live scores...');
+  const btn  = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  if (btn)  btn.disabled = true;
+  if (icon) icon.classList.add('spin');
+
+  let parsed = null;
+  let errMsg = '';
+  let cardsMap = {};
+
+  // 1. Fetch live events stream directly via frontend for 100% automated cards fallback
   try {
-    // 1. Fetch the main schedule and scores from your Cloudflare worker
-    const response = await fetch('YOUR_CLOUDFLARE_WORKER_URL');
-    const data = await response.json();
-    
-    // 2. Fetch the detailed open-source tournament events timeline 
-    let eventMap = {};
-    try {
-      const eventResponse = await fetch('https://worldcup-json-2026.fly.dev/matches');
-      if (eventResponse.ok) {
-        const eventsData = await eventResponse.json();
-        // Index card events by mapping team names to their card counts
-        eventsData.forEach(match => {
-          const homeName = match.home_team?.name?.toLowerCase();
-          const awayName = match.away_team?.name?.toLowerCase();
-          
-          if (homeName && awayName) {
-            const homeRed = (match.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
-            const awayRed = (match.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
-            
-            // Unique key combining team pairings to perfectly match your main payload
-            eventMap[`${homeName}-${awayName}`] = { homeRed, awayRed };
-          }
-        });
-      }
-    } catch (err) {
-      console.warn("Could not load external cards feed, falling back.", err);
+    const backupRes = await fetch('https://worldcup-json-2026.fly.dev/matches');
+    if (backupRes.ok) {
+      const backupData = await backupRes.json();
+      backupData.forEach(match => {
+        const hKey = norm(match.home_team?.name);
+        const aKey = norm(match.away_team?.name);
+        if (hKey && aKey) {
+          const homeRed = (match.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+          const awayRed = (match.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+          cardsMap[`${hKey}-${aKey}`] = { homeRed, awayRed };
+        }
+      });
     }
-
-    // 3. Process and merge both datasets
-    const converted = data.matches.map(m => {
-      const homeScore = m.score?.fullTime?.home ?? null;
-      const awayScore = m.score?.fullTime?.away ?? null;
-
-      let status = 'scheduled';
-      if      (m.status === 'FINISHED')                          status = 'finished';
-      else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') status = 'live';
-
-      const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
-      const stageLabel = m.group ? m.group.replace('GROUP_', 'Group ') : (m.stage || '').replace(/_/g, ' ');
-
-      // Automatically pair and retrieve red cards tracked by our event mapping
-      const homeKey = (m.homeTeam?.name || '').toLowerCase();
-      const awayKey = (m.awayTeam?.name || '').toLowerCase();
-      const cardData = eventMap[`${homeKey}-${awayKey}`] || { homeRed: 0, awayRed: 0 };
-
-      return {
-        homeTeam: m.homeTeam?.name || 'TBD',
-        awayTeam: m.awayTeam?.name || 'TBD',
-        homeScore, awayScore, status, aeT: isAeT,
-        stage: stageLabel, date: m.utcDate,
-        redCards: { home: cardData.homeRed, away: cardData.awayRed }
-      };
-    });
-
-    // Run your existing render functions using the newly mapped 'converted' data array here...
-    // e.g., renderDashboard(converted);
-
-  } catch (error) {
-    console.error("Dashboard update failed:", error);
+  } catch(e) {
+    console.warn("External events card feed fallback failed", e);
   }
+
+  // 2. Fetch standard scores via Cloudflare worker
+  try {
+    const res = await fetch(WORKER_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    parsed = await res.json();
+  } catch(e) { errMsg = e.message; }
+
+  if (parsed && parsed.matches) {
+    try {
+      const converted = parsed.matches.map(m => {
+        const homeScore = m.score?.fullTime?.home ?? null;
+        const awayScore = m.score?.fullTime?.away ?? null;
+
+        let status = 'scheduled';
+        if      (m.status === 'FINISHED')                           status = 'finished';
+        else if (m.status === 'IN_PLAY' || m.status === 'PAUSED')  status = 'live';
+
+        const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
+
+        const stageLabel = m.group
+          ? m.group.replace('GROUP_', 'Group ')
+          : (m.stage || '').replace(/_/g, ' ');
+
+        // Safely extract red cards by cross-referencing team objects against our data stream maps
+        const hNorm = norm(m.homeTeam?.name);
+        const aNorm = norm(m.awayTeam?.name);
+        const matchedCards = cardsMap[`${hNorm}-${aNorm}`] || { homeRed: 0, awayRed: 0 };
+
+        return {
+          homeTeam: m.homeTeam?.name || 'TBD',
+          awayTeam: m.awayTeam?.name || 'TBD',
+          homeScore, awayScore, status, aeT: isAeT,
+          stage: stageLabel, date: m.utcDate,
+          redCards: { home: matchedCards.homeRed, away: matchedCards.awayRed }
+        };
+      });
+
+      gameData = { ...gameData, matches: converted, lastUpdated: new Date().toISOString() };
+      buildScoredPlayers();
+      renderAll();
+
+      const ft   = converted.filter(m => m.status === 'finished').length;
+      const live = converted.filter(m => m.status === 'live').length;
+      setStatus('ok', 'Updated ' + new Date().toLocaleTimeString());
+      document.getElementById('headerSub').textContent =
+        ft + ' matches completed' + (live ? ' · ' + live + ' live' : '');
+
+    } catch(err) {
+      console.error(err);
+      setStatus('error', 'Parse error: ' + err.message);
+    }
+  } else {
+    setStatus('error', 'Could not load data (' + (errMsg || 'unknown') + ')');
+    document.getElementById('headerSub').textContent = 'Live data unavailable';
+    buildScoredPlayers();
+    renderAll();
+  }
+
+  if (btn)  btn.disabled = false;
+  if (icon) icon.classList.remove('spin');
 }
 
 // ── SCORING ───────────────────────────────────────────────────────────────────
@@ -566,18 +596,6 @@ function openTeamModal(teamName, ownerName) {
           <div class="breakdown-detail">${bd.detail}</div>
         </div>
         <div class="breakdown-pts ${bd.pts === 0 ? 'zero' : ''}">${fmtPts(bd.pts)} pts</div>`;
-      listEl.appendChild(row);
-    });
-
-    const bonuses = [];
-    gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) bonuses.push({ label: 'Qualified from group', pts: 0.5 }); });
-    if (norm(gameData.goldenBoot)       === norm(teamName)) bonuses.push({ label: 'Golden Boot', pts: 1 });
-    if (norm(gameData.goalOfTournament) === norm(teamName)) bonuses.push({ label: 'Goal of Tournament', pts: 1 });
-    if (norm(gameData.youngPlayer)      === norm(teamName)) bonuses.push({ label: 'Young Player of Tournament', pts: 1 });
-    bonuses.forEach(b => {
-      const row = document.createElement('div');
-      row.className = 'breakdown-row';
-      row.innerHTML = `<div style="flex:1"><div class="breakdown-match">${b.label}</div></div><div class="breakdown-pts">${fmtPts(b.pts)} pts</div>`;
       listEl.appendChild(row);
     });
   }
