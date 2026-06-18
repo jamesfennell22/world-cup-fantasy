@@ -391,7 +391,7 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-// ── FETCH & AUTONOMOUS EVENTS MERGING ─────────────────────────────────────────
+// ── FETCH & FUZZY MATCH EVENTS STREAM ─────────────────────────────────────────
 async function fetchAndUpdate() {
   setStatus('loading', 'Fetching live scores...');
   const btn  = document.getElementById('refreshBtn');
@@ -401,22 +401,13 @@ async function fetchAndUpdate() {
 
   let parsed = null;
   let errMsg = '';
-  let cardsMap = {};
+  let liveMatchesArray = [];
 
-  // 1. Fetch live events stream directly via frontend for 100% automated cards fallback
+  // 1. Fetch live events stream directly via frontend
   try {
     const backupRes = await fetch('https://worldcup-json-2026.fly.dev/matches');
     if (backupRes.ok) {
-      const backupData = await backupRes.json();
-      backupData.forEach(match => {
-        const hKey = norm(match.home_team?.name);
-        const aKey = norm(match.away_team?.name);
-        if (hKey && aKey) {
-          const homeRed = (match.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
-          const awayRed = (match.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
-          cardsMap[`${hKey}-${aKey}`] = { homeRed, awayRed };
-        }
-      });
+      liveMatchesArray = await backupRes.json();
     }
   } catch(e) {
     console.warn("External events card feed fallback failed", e);
@@ -445,17 +436,36 @@ async function fetchAndUpdate() {
           ? m.group.replace('GROUP_', 'Group ')
           : (m.stage || '').replace(/_/g, ' ');
 
-        // Safely extract red cards by cross-referencing team objects against our data stream maps
-        const hNorm = norm(m.homeTeam?.name);
-        const aNorm = norm(m.awayTeam?.name);
-        const matchedCards = cardsMap[`${hNorm}-${aNorm}`] || { homeRed: 0, awayRed: 0 };
+        // FUZZY SEARCH MATCH PAIRINGS: Resolves name/shorthand variances automatically
+        let homeRedCards = 0;
+        let awayRedCards = 0;
+
+        const primaryHome = norm(m.homeTeam?.name);
+        const primaryAway = norm(m.awayTeam?.name);
+
+        if (primaryHome && primaryAway) {
+          const foundMatch = liveMatchesArray.find(backupMatch => {
+            const bHome = norm(backupMatch.home_team?.name || backupMatch.home_team?.code);
+            const bAway = norm(backupMatch.away_team?.name || backupMatch.away_team?.code);
+            
+            const homeMatch = bHome.includes(primaryHome) || primaryHome.includes(bHome) || bHome.slice(0,3) === primaryHome.slice(0,3);
+            const awayMatch = bAway.includes(primaryAway) || primaryAway.includes(bAway) || bAway.slice(0,3) === primaryAway.slice(0,3);
+            
+            return homeMatch && awayMatch;
+          });
+
+          if (foundMatch) {
+            homeRedCards = (foundMatch.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+            awayRedCards = (foundMatch.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+          }
+        }
 
         return {
           homeTeam: m.homeTeam?.name || 'TBD',
           awayTeam: m.awayTeam?.name || 'TBD',
           homeScore, awayScore, status, aeT: isAeT,
           stage: stageLabel, date: m.utcDate,
-          redCards: { home: matchedCards.homeRed, away: matchedCards.awayRed }
+          redCards: { home: homeRedCards, away: awayRedCards }
         };
       });
 
