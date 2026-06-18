@@ -298,7 +298,15 @@ let gameData      = { matches: [], qualified: [], goldenBoot: null, goalOfTourna
 let scoredPlayers = [];
 let playerCount   = 0;
 
-function norm(t) { return t ? t.trim().toLowerCase() : ''; }
+// Upgraded normalizer to strip spaces, hyphens, and connecting words like 'and' or '&'
+function norm(t) { 
+  if (!t) return '';
+  return t.trim()
+          .toLowerCase()
+          .replace(/\band\b/g, '')  // Remove standalone word 'and'
+          .replace(/&/g, '')        // Remove ampersands
+          .replace(/[^a-z0-9]/g, ''); // Strip all remaining spaces, hyphens, or punctuation
+}
 
 function saveState() {
   localStorage.setItem('wcf_players', JSON.stringify(players));
