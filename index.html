@@ -337,28 +337,16 @@ async function fetchAndUpdate() {
   if (btn)  btn.disabled = true;
   if (icon) icon.classList.add('spin');
 
-  const apiUrl = `https://api.football-data.org/v4/competitions/${WC_COMPETITION_ID}/matches?limit=200`;
+  // Cloudflare Worker handles the API key and CORS
+  const WORKER_URL = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
   let parsed   = null;
   let errMsg   = '';
 
-  // Attempt 1: direct fetch (works if deployed on a server or CORS allows it)
   try {
-    const res = await fetch(apiUrl, { headers: { 'X-Auth-Token': API_KEY } });
+    const res = await fetch(WORKER_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     parsed = await res.json();
   } catch(e) { errMsg = e.message; }
-
-  // Attempt 2: allorigins proxy (strips headers, so the API key won't be sent;
-  // this will only work if football-data ever opens up unauthenticated access)
-  if (!parsed || !parsed.matches) {
-    try {
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
-      const res2 = await fetch(proxyUrl);
-      if (!res2.ok) throw new Error('Proxy HTTP ' + res2.status);
-      const outer = await res2.json();
-      parsed = JSON.parse(outer.contents);
-    } catch(e2) { errMsg = e2.message; }
-  }
 
   if (parsed && parsed.matches) {
     try {
