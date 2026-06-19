@@ -391,7 +391,7 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-// ── FETCH & FUZZY MATCH EVENTS STREAM ─────────────────────────────────────────
+// ── FETCH & DEBUG MATCH EVENTS STREAM ─────────────────────────────────────────
 async function fetchAndUpdate() {
   setStatus('loading', 'Fetching live scores...');
   const btn  = document.getElementById('refreshBtn');
@@ -408,6 +408,7 @@ async function fetchAndUpdate() {
     const backupRes = await fetch('https://worldcup-json-2026.fly.dev/matches');
     if (backupRes.ok) {
       liveMatchesArray = await backupRes.json();
+      console.log("DEBUG: Received secondary match stream data payload directly.", liveMatchesArray);
     }
   } catch(e) {
     console.warn("External events card feed fallback failed", e);
@@ -436,7 +437,6 @@ async function fetchAndUpdate() {
           ? m.group.replace('GROUP_', 'Group ')
           : (m.stage || '').replace(/_/g, ' ');
 
-        // FUZZY SEARCH MATCH PAIRINGS: Resolves name/shorthand variances automatically
         let homeRedCards = 0;
         let awayRedCards = 0;
 
@@ -457,6 +457,8 @@ async function fetchAndUpdate() {
           if (foundMatch) {
             homeRedCards = (foundMatch.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
             awayRedCards = (foundMatch.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+            
+            console.log(`DEBUG MATCHED: Primary [${m.homeTeam?.name} vs ${m.awayTeam?.name}] matched with Secondary API entry [${foundMatch.home_team?.name || foundMatch.home_team?.code} vs ${foundMatch.away_team?.name || foundMatch.away_team?.code}]. Cards found: Home: ${homeRedCards}, Away: ${awayRedCards}`);
           }
         }
 
