@@ -53,7 +53,6 @@
   .roster-breakdown { margin-top: 0.5rem; display: none; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); }
   .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
 
-  /* Clickable team tags */
   .team-tag {
     background: var(--card); border: 1px solid var(--border); padding: 0.6rem 0.5rem;
     border-radius: 6px; text-align: center; font-size: 0.85rem;
@@ -121,7 +120,6 @@
   .breakdown-pts.zero { color: var(--muted); }
   .breakdown-detail { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
 
-  /* Overlay Initial Layout */
   .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; justify-content: center; align-items: flex-start; padding: 2rem 1rem; overflow-y: auto; }
   .setup-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; max-width: 650px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
   .setup-header { text-align: center; margin-bottom: 2rem; }
@@ -251,7 +249,6 @@
           <div class="rule-row"><span class="rule-pts pos">+1</span><span>Draw</span></div>
           <div class="rule-row"><span class="rule-pts pos">+1</span><span>Bonus: win by 3+ goals</span></div>
           <div class="rule-row"><span class="rule-pts pos">+0.5</span><span>Clean sheet</span></div>
-          <div class="rule-row"><span class="rule-pts neg">-1</span><span>Per red card</span></div>
         </div>
         <div class="rule-section">Tournament</div>
         <div class="rules-list">
@@ -277,10 +274,8 @@
 </div>
 
 <script>
-// ── CONFIG ────────────────────────────────────────────────────────────────────
 const WORKER_URL = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
 let players       = [];
 let gameData      = { matches: [], qualified: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
 let scoredPlayers = [];
@@ -288,7 +283,8 @@ let playerCount   = 0;
 
 function norm(t) { 
   if (!t) return '';
-  return t.trim()
+  if (typeof t === 'object' && t.name) t = t.name;
+  return t.toString().trim()
           .toLowerCase()
           .replace(/\band\b/g, '')
           .replace(/&/g, '')
@@ -312,7 +308,6 @@ function loadState() {
   return false;
 }
 
-// ── UI HELPERS ────────────────────────────────────────────────────────────────
 function setStatus(type, msg) {
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
@@ -380,14 +375,17 @@ function toggleRoster(id) {
 
 function fmtPts(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 
-function formatDate(utc) {
-  if (!utc) return 'TBD';
-  return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+function formatDate(dateStr) {
+  if (!dateStr) return 'TBD';
+  try {
+    return new Date(dateStr).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  } catch(e) {
+    return dateStr;
+  }
 }
 
-// ── FETCH & UPDATE ────────────────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Fetching match streams...');
+  setStatus('loading', 'Updating leaderboard...');
   const btn  = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn)  btn.disabled = true;
@@ -407,37 +405,24 @@ async function fetchAndUpdate() {
   if (parsed && parsed.matches) {
     try {
       const converted = parsed.matches.map(m => {
-        const homeScore = m.score?.fullTime?.home ?? null;
-        const awayScore = m.score?.fullTime?.away ?? null;
+        const homeScore = (m.score1 !== undefined && m.score1 !== null) ? m.score1 : null;
+        const awayScore = (m.score2 !== undefined && m.score2 !== null) ? m.score2 : null;
 
         let status = 'scheduled';
-        if (m.status === 'FINISHED') {
-          status = 'finished';
-        } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
-          status = 'live';
+        if (homeScore !== null && awayScore !== null) {
+          status = m.live ? 'live' : 'finished';
         }
 
-        const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
-
-        // Read embedded structural items safely from football-data structure
-        let homeRed = 0, awayRed = 0;
-        (m.bookings || []).forEach(b => {
-          if (b.card === 'RED' || b.card === 'YELLOW_RED') {
-            if (b.team?.id === m.homeTeam?.id) homeRed++;
-            else if (b.team?.id === m.awayTeam?.id) awayRed++;
-          }
-        });
-
-        const stageLabel = m.group
-          ? m.group.replace('GROUP_', 'Group ')
-          : (m.stage || '').replace(/_/g, ' ');
+        const hName = m.team1?.name || m.team1 || 'TBD';
+        const aName = m.team2?.name || m.team2 || 'TBD';
 
         return {
-          homeTeam: m.homeTeam?.name || 'TBD',
-          awayTeam: m.awayTeam?.name || 'TBD',
-          homeScore, awayScore, status, aeT: isAeT,
-          stage: stageLabel, date: m.utcDate,
-          redCards: { home: homeRed, away: awayRed }
+          homeTeam: hName,
+          awayTeam: aName,
+          homeScore, awayScore, status, aeT: m.aet || false,
+          stage: m.round || 'Tournament Match', 
+          date: m.date ? m.date + (m.time ? 'T' + m.time : '') : null,
+          redCards: { home: 0, away: 0 }
         };
       });
 
@@ -456,7 +441,7 @@ async function fetchAndUpdate() {
       setStatus('error', 'Parse error: ' + err.message);
     }
   } else {
-    setStatus('error', 'Could not load data (' + (errMsg || 'Forbidden 403') + ')');
+    setStatus('error', 'Could not load data (' + (errMsg || 'Payload Error') + ')');
     document.getElementById('headerSub').textContent = 'Live data unavailable';
     buildScoredPlayers();
     renderAll();
@@ -466,16 +451,14 @@ async function fetchAndUpdate() {
   if (icon) icon.classList.remove('spin');
 }
 
-// ── SCORING ───────────────────────────────────────────────────────────────────
 function getMatchPointsForTeam(teamName, m) {
   const isHome = norm(m.homeTeam) === norm(teamName);
   const isAway = norm(m.awayTeam) === norm(teamName);
   if (!isHome && !isAway) return 0;
   if (m.status !== 'finished' && m.status !== 'live') return 0;
 
-  const self   = isHome ? m.homeScore : m.awayScore;
-  const opp    = isHome ? m.awayScore : m.homeScore;
-  const redCds = isHome ? m.redCards.home : m.redCards.away;
+  const self = isHome ? m.homeScore : m.awayScore;
+  const opp  = isHome ? m.awayScore : m.homeScore;
 
   let pts = 0;
   if (self > opp) {
@@ -485,7 +468,6 @@ function getMatchPointsForTeam(teamName, m) {
     pts += 1;
   }
   if (opp === 0) pts += 0.5;
-  pts -= redCds;
   return pts;
 }
 
@@ -495,10 +477,8 @@ function getMatchPointsBreakdown(teamName, m) {
   if (!isHome && !isAway) return null;
   if (m.status !== 'finished' && m.status !== 'live') return null;
 
-  const self   = isHome ? m.homeScore : m.awayScore;
-  const opp    = isHome ? m.awayScore : m.homeScore;
-  const redCds = isHome ? m.redCards.home : m.redCards.away;
-  const opp_name = isHome ? m.awayTeam : m.homeTeam;
+  const self = isHome ? m.homeScore : m.awayScore;
+  const opp  = isHome ? m.awayScore : m.homeScore;
   const parts  = [];
   let pts = 0;
 
@@ -513,9 +493,8 @@ function getMatchPointsBreakdown(teamName, m) {
     parts.push('Loss');
   }
   if (opp === 0) { pts += 0.5; parts.push('Clean sheet +0.5'); }
-  if (redCds > 0) { pts -= redCds; parts.push('Red card(s) -' + redCds); }
 
-  return { pts, detail: parts.join(' · '), scoreStr: self + '-' + opp, opp: opp_name };
+  return { pts, detail: parts.join(' · '), scoreStr: self + '-' + opp };
 }
 
 function calculateTeamTotalPoints(teamName) {
@@ -545,7 +524,6 @@ function getOwners(teamName) {
   return scoredPlayers.filter(p => p.breakdown.some(b => norm(b.team) === norm(teamName)));
 }
 
-// ── DETAILS MODAL ─────────────────────────────────────────────────────────────
 function openTeamModal(teamName, ownerName) {
   const modal = document.getElementById('teamModal');
   document.getElementById('modalTeamName').textContent = teamName;
@@ -580,18 +558,6 @@ function openTeamModal(teamName, ownerName) {
         <div class="breakdown-pts ${bd.pts === 0 ? 'zero' : ''}">${fmtPts(bd.pts)} pts</div>`;
       listEl.appendChild(row);
     });
-
-    const bonuses = [];
-    gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) bonuses.push({ label: 'Qualified from group', pts: 0.5 }); });
-    if (norm(gameData.goldenBoot)       === norm(teamName)) bonuses.push({ label: 'Golden Boot', pts: 1 });
-    if (norm(gameData.goalOfTournament) === norm(teamName)) bonuses.push({ label: 'Goal of Tournament', pts: 1 });
-    if (norm(gameData.youngPlayer)      === norm(teamName)) bonuses.push({ label: 'Young Player of Tournament', pts: 1 });
-    bonuses.forEach(b => {
-      const row = document.createElement('div');
-      row.className = 'breakdown-row';
-      row.innerHTML = `<div style="flex:1"><div class="breakdown-match">${b.label}</div></div><div class="breakdown-pts">${fmtPts(b.pts)} pts</div>`;
-      listEl.appendChild(row);
-    });
   }
 
   modal.style.display = 'flex';
@@ -609,7 +575,6 @@ function closeModalOnBackdrop(e) {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-// ── RENDER ENGINE ─────────────────────────────────────────────────────────────
 function renderAll() {
   renderLeaderboard();
   renderLiveRecent();
@@ -690,7 +655,7 @@ function renderLiveRecent() {
   c.innerHTML = '';
   const list = gameData.matches.filter(m => m.status === 'live' || m.status === 'finished');
   if (!list.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No matches computed yet.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No active tournament matches recorded.</div>';
     return;
   }
   const live     = list.filter(m => m.status === 'live');
@@ -706,7 +671,7 @@ function renderMatches() {
   const scheduled = gameData.matches.filter(m => m.status === 'scheduled');
 
   if (!live.length && !scheduled.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No upcoming matches listed.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No upcoming matches.</div>';
     return;
   }
 
@@ -739,7 +704,7 @@ function renderResults() {
   c.innerHTML = '';
   const list = gameData.matches.filter(m => m.status === 'finished');
   if (!list.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No finished matches.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No match results yet.</div>';
     return;
   }
   [...list].reverse().forEach(m => c.appendChild(buildMatchCard(m, true)));
@@ -788,7 +753,6 @@ function renderMatrix() {
   c.innerHTML = html + `</tbody></table>`;
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   if (loadState() && players.length >= 2) {
     document.getElementById('playerInputs').innerHTML = '';
