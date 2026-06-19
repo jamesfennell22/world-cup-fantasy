@@ -205,7 +205,7 @@
       <button class="tab-btn"        onclick="switchTab(event,'matchesTab')">Matches</button>
       <button class="tab-btn"        onclick="switchTab(event,'resultsTab')">Results</button>
       <button class="tab-btn"        onclick="switchTab(event,'matrixTab')">Head-to-Head</button>
-      <button class="tab-btn"        onclick="rulesTabTab(event,'rulesTab')">Rules</button>
+      <button class="tab-btn"        onclick="switchTab(event,'rulesTab')">Rules</button>
     </nav>
 
     <div id="leaderboardTab" class="tab-content active">
@@ -298,8 +298,8 @@ function norm(t) {
 }
 
 function saveState() {
-  const payload = btoa(JSON.stringify(players));
   localStorage.setItem('wcf_players', JSON.stringify(players));
+  const payload = btoa(JSON.stringify(players));
   history.pushState({}, '', location.pathname + '?league=' + payload);
 }
 
@@ -327,10 +327,6 @@ function switchTab(e, id) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   e.currentTarget.classList.add('active');
   document.getElementById(id).classList.add('active');
-}
-
-function rulesTabTab(e, id) {
-  switchTab(e, id);
 }
 
 function addPlayerInput(ex = null) {
@@ -391,29 +387,39 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-// ── SAFE BACKEND-DRIVEN FETCH ─────────────────────────────────────────────────
+// ── FETCH ─────────────────────────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Fetching live scores & cards...');
+  setStatus('loading', 'Fetching live data...');
   const btn  = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn)  btn.disabled = true;
   if (icon) icon.classList.add('spin');
 
   let parsed = null;
+  let backupMatches = [];
   let errMsg = '';
 
-  // Single safe fetch via your Cloudflare worker to rule out all Frontend CORS errors
+  // 1. Fetch Primary Matches from Worker
   try {
     const res = await fetch(WORKER_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    parsed = await res.json();
+    const rawData = await res.json();
+    // Support handling both formats seamlessly (direct worker proxy vs bundled format)
+    parsed = rawData.matches ? rawData : { matches: rawData };
   } catch(e) { errMsg = e.message; }
+
+  // 2. Safely Fetch Red Cards (Fallback natively if CORS-blocked, otherwise cross-reference)
+  try {
+    const backupRes = await fetch("https://worldcup-json-2026.fly.dev/matches");
+    if (backupRes.ok) {
+      backupMatches = await backupRes.json();
+    }
+  } catch(e) {
+    console.log("External cards feed bypassed or blocked; cross-referencing inline bookings.");
+  }
 
   if (parsed && parsed.matches) {
     try {
-      // If the backend worker successfully included the fallback matches payload, use it
-      const liveMatchesArray = parsed.backupMatches || [];
-
       const converted = parsed.matches.map(m => {
         const homeScore = m.score?.fullTime?.home ?? null;
         const awayScore = m.score?.fullTime?.away ?? null;
@@ -424,39 +430,42 @@ async function fetchAndUpdate() {
 
         const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
 
-        const stageLabel = m.group
-          ? m.group.replace('GROUP_', 'Group ')
-          : (m.stage || '').replace(/_/g, ' ');
+        // Method A: Check inline API bookings data
+        let homeRed = 0, awayRed = 0;
+        (m.bookings || []).forEach(b => {
+          if (b.card === 'RED' || b.card === 'YELLOW_RED') {
+            if (b.team?.id === m.homeTeam?.id) homeRed++;
+            else if (b.team?.id === m.awayTeam?.id) awayRed++;
+          }
+        });
 
-        let homeRedCards = 0;
-        let awayRedCards = 0;
-
+        // Method B: Cross-reference external feed if loaded successfully
         const primaryHome = norm(m.homeTeam?.name);
         const primaryAway = norm(m.awayTeam?.name);
 
-        if (primaryHome && primaryAway && liveMatchesArray.length > 0) {
-          const foundMatch = liveMatchesArray.find(backupMatch => {
-            const bHome = norm(backupMatch.home_team?.name || backupMatch.home_team?.code);
-            const bAway = norm(backupMatch.away_team?.name || backupMatch.away_team?.code);
-            
-            const homeMatch = bHome.includes(primaryHome) || primaryHome.includes(bHome) || bHome.slice(0,3) === primaryHome.slice(0,3);
-            const awayMatch = bAway.includes(primaryAway) || primaryAway.includes(bAway) || bAway.slice(0,3) === primaryAway.slice(0,3);
-            
-            return homeMatch && awayMatch;
+        if (primaryHome && primaryAway && backupMatches.length > 0) {
+          const foundMatch = backupMatches.find(bm => {
+            const bHome = norm(bm.home_team?.name || bm.home_team?.code);
+            const bAway = norm(bm.away_team?.name || bm.away_team?.code);
+            return (bHome.includes(primaryHome) || primaryHome.includes(bHome)) &&
+                   (bAway.includes(primaryAway) || primaryAway.includes(bAway));
           });
-
           if (foundMatch) {
-            homeRedCards = (foundMatch.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
-            awayRedCards = (foundMatch.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
+            homeRed = Math.max(homeRed, (foundMatch.home_team_events || []).filter(e => e.type_of_event === 'red-card').length);
+            awayRed = Math.max(awayRed, (foundMatch.away_team_events || []).filter(e => e.type_of_event === 'red-card').length);
           }
         }
+
+        const stageLabel = m.group
+          ? m.group.replace('GROUP_', 'Group ')
+          : (m.stage || '').replace(/_/g, ' ');
 
         return {
           homeTeam: m.homeTeam?.name || 'TBD',
           awayTeam: m.awayTeam?.name || 'TBD',
           homeScore, awayScore, status, aeT: isAeT,
           stage: stageLabel, date: m.utcDate,
-          redCards: { home: homeRedCards, away: awayRedCards }
+          redCards: { home: homeRed, away: awayRed }
         };
       });
 
@@ -494,7 +503,7 @@ function getMatchPointsForTeam(teamName, m) {
 
   const self   = isHome ? m.homeScore : m.awayScore;
   const opp    = isHome ? m.awayScore : m.homeScore;
-  const redCds = isHome ? (m.redCards?.home || 0) : (m.redCards?.away || 0);
+  const redCds = isHome ? m.redCards.home : m.redCards.away;
 
   let pts = 0;
   if (self > opp) {
@@ -516,7 +525,7 @@ function getMatchPointsBreakdown(teamName, m) {
 
   const self   = isHome ? m.homeScore : m.awayScore;
   const opp    = isHome ? m.awayScore : m.homeScore;
-  const redCds = isHome ? (m.redCards?.home || 0) : (m.redCards?.away || 0);
+  const redCds = isHome ? m.redCards.home : m.redCards.away;
   const opp_name = isHome ? m.awayTeam : m.homeTeam;
   const parts  = [];
   let pts = 0;
@@ -597,6 +606,18 @@ function openTeamModal(teamName, ownerName) {
           <div class="breakdown-detail">${bd.detail}</div>
         </div>
         <div class="breakdown-pts ${bd.pts === 0 ? 'zero' : ''}">${fmtPts(bd.pts)} pts</div>`;
+      listEl.appendChild(row);
+    });
+
+    const bonuses = [];
+    gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) bonuses.push({ label: 'Qualified from group', pts: 0.5 }); });
+    if (norm(gameData.goldenBoot)       === norm(teamName)) bonuses.push({ label: 'Golden Boot', pts: 1 });
+    if (norm(gameData.goalOfTournament) === norm(teamName)) bonuses.push({ label: 'Goal of Tournament', pts: 1 });
+    if (norm(gameData.youngPlayer)      === norm(teamName)) bonuses.push({ label: 'Young Player of Tournament', pts: 1 });
+    bonuses.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'breakdown-row';
+      row.innerHTML = `<div style="flex:1"><div class="breakdown-match">${b.label}</div></div><div class="breakdown-pts">${fmtPts(b.pts)} pts</div>`;
       listEl.appendChild(row);
     });
   }
@@ -709,7 +730,7 @@ function renderMatches() {
   const c = document.getElementById('matchesContainer');
   c.innerHTML = '';
 
-  const live      = gameData.matches.filter(m => m.status === 'live');
+  const live = gameData.matches.filter(m => m.status === 'live');
   const scheduled = gameData.matches.filter(m => m.status === 'scheduled');
 
   if (!live.length && !scheduled.length) {
