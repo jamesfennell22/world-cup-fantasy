@@ -391,9 +391,9 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-// ── FETCH & DEBUG MATCH EVENTS STREAM ─────────────────────────────────────────
+// ── SAFE BACKEND-DRIVEN FETCH ─────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Fetching live scores...');
+  setStatus('loading', 'Fetching live scores & cards...');
   const btn  = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn)  btn.disabled = true;
@@ -401,20 +401,8 @@ async function fetchAndUpdate() {
 
   let parsed = null;
   let errMsg = '';
-  let liveMatchesArray = [];
 
-  // 1. Fetch live events stream directly via frontend
-  try {
-    const backupRes = await fetch('https://worldcup-json-2026.fly.dev/matches');
-    if (backupRes.ok) {
-      liveMatchesArray = await backupRes.json();
-      console.log("DEBUG: Received secondary match stream data payload directly.", liveMatchesArray);
-    }
-  } catch(e) {
-    console.warn("External events card feed fallback failed", e);
-  }
-
-  // 2. Fetch standard scores via Cloudflare worker
+  // Single safe fetch via your Cloudflare worker to rule out all Frontend CORS errors
   try {
     const res = await fetch(WORKER_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -423,6 +411,9 @@ async function fetchAndUpdate() {
 
   if (parsed && parsed.matches) {
     try {
+      // If the backend worker successfully included the fallback matches payload, use it
+      const liveMatchesArray = parsed.backupMatches || [];
+
       const converted = parsed.matches.map(m => {
         const homeScore = m.score?.fullTime?.home ?? null;
         const awayScore = m.score?.fullTime?.away ?? null;
@@ -443,7 +434,7 @@ async function fetchAndUpdate() {
         const primaryHome = norm(m.homeTeam?.name);
         const primaryAway = norm(m.awayTeam?.name);
 
-        if (primaryHome && primaryAway) {
+        if (primaryHome && primaryAway && liveMatchesArray.length > 0) {
           const foundMatch = liveMatchesArray.find(backupMatch => {
             const bHome = norm(backupMatch.home_team?.name || backupMatch.home_team?.code);
             const bAway = norm(backupMatch.away_team?.name || backupMatch.away_team?.code);
@@ -457,8 +448,6 @@ async function fetchAndUpdate() {
           if (foundMatch) {
             homeRedCards = (foundMatch.home_team_events || []).filter(e => e.type_of_event === 'red-card').length;
             awayRedCards = (foundMatch.away_team_events || []).filter(e => e.type_of_event === 'red-card').length;
-            
-            console.log(`DEBUG MATCHED: Primary [${m.homeTeam?.name} vs ${m.awayTeam?.name}] matched with Secondary API entry [${foundMatch.home_team?.name || foundMatch.home_team?.code} vs ${foundMatch.away_team?.name || foundMatch.away_team?.code}]. Cards found: Home: ${homeRedCards}, Away: ${awayRedCards}`);
           }
         }
 
