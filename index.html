@@ -53,7 +53,7 @@
   .roster-breakdown { margin-top: 0.5rem; display: none; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); }
   .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
 
-  /* Clickable team cards */
+  /* Clickable team tags */
   .team-tag {
     background: var(--card); border: 1px solid var(--border); padding: 0.6rem 0.5rem;
     border-radius: 6px; text-align: center; font-size: 0.85rem;
@@ -63,7 +63,7 @@
   .team-tag .t-name { font-weight: 500; display: block; margin-bottom: 0.25rem; }
   .team-tag .t-pts  { font-size: 0.75rem; color: var(--muted); }
 
-  /* Match cards */
+  /* Matches */
   .match-list { display: flex; flex-direction: column; gap: 0.75rem; }
   .match-card { background: var(--card); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem 1rem 1.75rem; position: relative; }
   .match-card.has-interest { border-color: rgba(245,166,35,0.25); }
@@ -79,17 +79,15 @@
   .m-status.live      { background: rgba(232,64,64,0.2); color: var(--accent2); animation: pulse 1s infinite; }
   .m-status.scheduled { background: rgba(245,166,35,0.1); color: var(--accent); }
 
-  /* Player ownership badges on match cards */
   .ownership-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
   .owner-badge { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 12px; background: rgba(245,166,35,0.12); color: var(--accent); border: 1px solid rgba(245,166,35,0.25); }
   .owner-badge.home { background: rgba(34,197,94,0.1); color: var(--green); border-color: rgba(34,197,94,0.25); }
   .owner-badge.away { background: rgba(122,139,168,0.12); color: var(--muted); border-color: rgba(122,139,168,0.25); }
 
-  /* Section divider in matches tab */
   .section-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 1px; color: var(--muted); margin: 1.25rem 0 0.5rem; text-transform: uppercase; }
   .section-label:first-child { margin-top: 0; }
 
-  /* Matrix */
+  /* Matrix Table */
   .table-responsive { overflow-x: auto; width: 100%; }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
@@ -97,7 +95,7 @@
   tr:hover td { background: rgba(255,255,255,0.01); }
   .match-cell { color: var(--accent); font-weight: 600; }
 
-  /* Rules */
+  /* Rules Rules */
   .rules-list { display: flex; flex-direction: column; gap: 0.6rem; }
   .rule-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: var(--card); border-radius: 8px; }
   .rule-pts { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; min-width: 65px; text-align: right; }
@@ -105,7 +103,7 @@
   .rule-pts.neg { color: var(--accent2); }
   .rule-section { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--muted); letter-spacing: 1px; margin: 1.25rem 0 0.5rem; text-transform: uppercase; }
 
-  /* Team detail modal */
+  /* Modal Dialog */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; overflow-y: auto; animation: fadeIn 0.2s ease; }
   .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.75rem; max-width: 560px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.6); }
   .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
@@ -123,7 +121,7 @@
   .breakdown-pts.zero { color: var(--muted); }
   .breakdown-detail { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
 
-  /* Setup overlay */
+  /* Overlay Initial Layout */
   .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; justify-content: center; align-items: flex-start; padding: 2rem 1rem; overflow-y: auto; }
   .setup-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; max-width: 650px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
   .setup-header { text-align: center; margin-bottom: 2rem; }
@@ -154,7 +152,7 @@
   <div class="setup-container">
     <div class="setup-header">
       <h2>League Setup</h2>
-      <p>Add each player and their 6 teams, then launch the dashboard.</p>
+      <p>Add players and assign their 6 tournament teams.</p>
     </div>
     <div id="playerInputs"></div>
     <div class="setup-actions">
@@ -387,35 +385,23 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
-// ── FETCH ─────────────────────────────────────────────────────────────────────
+// ── FETCH & UPDATE ────────────────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Fetching live data...');
+  setStatus('loading', 'Fetching match streams...');
   const btn  = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn)  btn.disabled = true;
   if (icon) icon.classList.add('spin');
 
   let parsed = null;
-  let backupMatches = [];
   let errMsg = '';
 
-  // 1. Fetch Primary Matches from Worker
   try {
     const res = await fetch(WORKER_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const rawData = await res.json();
-    // Support handling both formats seamlessly (direct worker proxy vs bundled format)
-    parsed = rawData.matches ? rawData : { matches: rawData };
-  } catch(e) { errMsg = e.message; }
-
-  // 2. Safely Fetch Red Cards (Fallback natively if CORS-blocked, otherwise cross-reference)
-  try {
-    const backupRes = await fetch("https://worldcup-json-2026.fly.dev/matches");
-    if (backupRes.ok) {
-      backupMatches = await backupRes.json();
-    }
-  } catch(e) {
-    console.log("External cards feed bypassed or blocked; cross-referencing inline bookings.");
+    parsed = await res.json();
+  } catch(e) { 
+    errMsg = e.message; 
   }
 
   if (parsed && parsed.matches) {
@@ -425,12 +411,15 @@ async function fetchAndUpdate() {
         const awayScore = m.score?.fullTime?.away ?? null;
 
         let status = 'scheduled';
-        if      (m.status === 'FINISHED')                           status = 'finished';
-        else if (m.status === 'IN_PLAY' || m.status === 'PAUSED')  status = 'live';
+        if (m.status === 'FINISHED') {
+          status = 'finished';
+        } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
+          status = 'live';
+        }
 
         const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
 
-        // Method A: Check inline API bookings data
+        // Read embedded structural items safely from football-data structure
         let homeRed = 0, awayRed = 0;
         (m.bookings || []).forEach(b => {
           if (b.card === 'RED' || b.card === 'YELLOW_RED') {
@@ -438,23 +427,6 @@ async function fetchAndUpdate() {
             else if (b.team?.id === m.awayTeam?.id) awayRed++;
           }
         });
-
-        // Method B: Cross-reference external feed if loaded successfully
-        const primaryHome = norm(m.homeTeam?.name);
-        const primaryAway = norm(m.awayTeam?.name);
-
-        if (primaryHome && primaryAway && backupMatches.length > 0) {
-          const foundMatch = backupMatches.find(bm => {
-            const bHome = norm(bm.home_team?.name || bm.home_team?.code);
-            const bAway = norm(bm.away_team?.name || bm.away_team?.code);
-            return (bHome.includes(primaryHome) || primaryHome.includes(bHome)) &&
-                   (bAway.includes(primaryAway) || primaryAway.includes(bAway));
-          });
-          if (foundMatch) {
-            homeRed = Math.max(homeRed, (foundMatch.home_team_events || []).filter(e => e.type_of_event === 'red-card').length);
-            awayRed = Math.max(awayRed, (foundMatch.away_team_events || []).filter(e => e.type_of_event === 'red-card').length);
-          }
-        }
 
         const stageLabel = m.group
           ? m.group.replace('GROUP_', 'Group ')
@@ -484,7 +456,7 @@ async function fetchAndUpdate() {
       setStatus('error', 'Parse error: ' + err.message);
     }
   } else {
-    setStatus('error', 'Could not load data (' + (errMsg || 'unknown') + ')');
+    setStatus('error', 'Could not load data (' + (errMsg || 'Forbidden 403') + ')');
     document.getElementById('headerSub').textContent = 'Live data unavailable';
     buildScoredPlayers();
     renderAll();
@@ -573,7 +545,7 @@ function getOwners(teamName) {
   return scoredPlayers.filter(p => p.breakdown.some(b => norm(b.team) === norm(teamName)));
 }
 
-// ── TEAM DETAIL MODAL ─────────────────────────────────────────────────────────
+// ── DETAILS MODAL ─────────────────────────────────────────────────────────────
 function openTeamModal(teamName, ownerName) {
   const modal = document.getElementById('teamModal');
   document.getElementById('modalTeamName').textContent = teamName;
@@ -637,7 +609,7 @@ function closeModalOnBackdrop(e) {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-// ── RENDER ────────────────────────────────────────────────────────────────────
+// ── RENDER ENGINE ─────────────────────────────────────────────────────────────
 function renderAll() {
   renderLeaderboard();
   renderLiveRecent();
@@ -718,7 +690,7 @@ function renderLiveRecent() {
   c.innerHTML = '';
   const list = gameData.matches.filter(m => m.status === 'live' || m.status === 'finished');
   if (!list.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No matches yet.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No matches computed yet.</div>';
     return;
   }
   const live     = list.filter(m => m.status === 'live');
@@ -734,7 +706,7 @@ function renderMatches() {
   const scheduled = gameData.matches.filter(m => m.status === 'scheduled');
 
   if (!live.length && !scheduled.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No upcoming matches.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No upcoming matches listed.</div>';
     return;
   }
 
@@ -753,7 +725,7 @@ function renderMatches() {
   if (scheduled.length) {
     const upLabel = document.createElement('div');
     upLabel.className = 'section-label';
-    upLabel.textContent = 'Upcoming';
+    upLabel.textContent = 'Upcoming Matches';
     c.appendChild(upLabel);
     const upList = document.createElement('div');
     upList.className = 'match-list';
@@ -767,7 +739,7 @@ function renderResults() {
   c.innerHTML = '';
   const list = gameData.matches.filter(m => m.status === 'finished');
   if (!list.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No results yet.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No finished matches.</div>';
     return;
   }
   [...list].reverse().forEach(m => c.appendChild(buildMatchCard(m, true)));
