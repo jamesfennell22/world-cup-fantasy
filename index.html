@@ -53,6 +53,7 @@
   .roster-breakdown { margin-top: 0.5rem; display: none; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); }
   .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
 
+  /* Clickable team cards */
   .team-tag {
     background: var(--card); border: 1px solid var(--border); padding: 0.6rem 0.5rem;
     border-radius: 6px; text-align: center; font-size: 0.85rem;
@@ -62,7 +63,7 @@
   .team-tag .t-name { font-weight: 500; display: block; margin-bottom: 0.25rem; }
   .team-tag .t-pts  { font-size: 0.75rem; color: var(--muted); }
 
-  /* Matches */
+  /* Match cards */
   .match-list { display: flex; flex-direction: column; gap: 0.75rem; }
   .match-card { background: var(--card); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 1rem 1rem 1.75rem; position: relative; }
   .match-card.has-interest { border-color: rgba(245,166,35,0.25); }
@@ -78,15 +79,17 @@
   .m-status.live      { background: rgba(232,64,64,0.2); color: var(--accent2); animation: pulse 1s infinite; }
   .m-status.scheduled { background: rgba(245,166,35,0.1); color: var(--accent); }
 
+  /* Player ownership badges on match cards */
   .ownership-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
   .owner-badge { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 12px; background: rgba(245,166,35,0.12); color: var(--accent); border: 1px solid rgba(245,166,35,0.25); }
   .owner-badge.home { background: rgba(34,197,94,0.1); color: var(--green); border-color: rgba(34,197,94,0.25); }
   .owner-badge.away { background: rgba(122,139,168,0.12); color: var(--muted); border-color: rgba(122,139,168,0.25); }
 
+  /* Section divider in matches tab */
   .section-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 1px; color: var(--muted); margin: 1.25rem 0 0.5rem; text-transform: uppercase; }
   .section-label:first-child { margin-top: 0; }
 
-  /* Matrix Table */
+  /* Matrix */
   .table-responsive { overflow-x: auto; width: 100%; }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
@@ -94,7 +97,7 @@
   tr:hover td { background: rgba(255,255,255,0.01); }
   .match-cell { color: var(--accent); font-weight: 600; }
 
-  /* Rules Rules */
+  /* Rules */
   .rules-list { display: flex; flex-direction: column; gap: 0.6rem; }
   .rule-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: var(--card); border-radius: 8px; }
   .rule-pts { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; min-width: 65px; text-align: right; }
@@ -102,7 +105,7 @@
   .rule-pts.neg { color: var(--accent2); }
   .rule-section { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--muted); letter-spacing: 1px; margin: 1.25rem 0 0.5rem; text-transform: uppercase; }
 
-  /* Modal Dialog */
+  /* Team detail modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; overflow-y: auto; animation: fadeIn 0.2s ease; }
   .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.75rem; max-width: 560px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.6); }
   .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
@@ -120,6 +123,7 @@
   .breakdown-pts.zero { color: var(--muted); }
   .breakdown-detail { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
 
+  /* Setup overlay */
   .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 9999; display: flex; justify-content: center; align-items: flex-start; padding: 2rem 1rem; overflow-y: auto; }
   .setup-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; max-width: 650px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
   .setup-header { text-align: center; margin-bottom: 2rem; }
@@ -150,7 +154,7 @@
   <div class="setup-container">
     <div class="setup-header">
       <h2>League Setup</h2>
-      <p>Add players and assign their 6 tournament teams.</p>
+      <p>Add each player and their 6 teams, then launch the dashboard.</p>
     </div>
     <div id="playerInputs"></div>
     <div class="setup-actions">
@@ -249,6 +253,7 @@
           <div class="rule-row"><span class="rule-pts pos">+1</span><span>Draw</span></div>
           <div class="rule-row"><span class="rule-pts pos">+1</span><span>Bonus: win by 3+ goals</span></div>
           <div class="rule-row"><span class="rule-pts pos">+0.5</span><span>Clean sheet</span></div>
+          <div class="rule-row"><span class="rule-pts neg">-1</span><span>Per red card</span></div>
         </div>
         <div class="rule-section">Tournament</div>
         <div class="rules-list">
@@ -274,8 +279,12 @@
 </div>
 
 <script>
-const WORKER_URL = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const API_KEY           = '01c0a0cdc86a441aa5c96ac0f075b184';
+const WC_COMPETITION_ID = 2000;
+const WORKER_URL        = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
 
+// ── STATE ─────────────────────────────────────────────────────────────────────
 let players       = [];
 let gameData      = { matches: [], qualified: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
 let scoredPlayers = [];
@@ -283,7 +292,7 @@ let playerCount   = 0;
 
 function norm(t) { 
   if (!t) return '';
-  return t.toString().trim()
+  return t.trim()
           .toLowerCase()
           .replace(/\band\b/g, '')
           .replace(/&/g, '')
@@ -291,8 +300,8 @@ function norm(t) {
 }
 
 function saveState() {
-  localStorage.setItem('wcf_players', JSON.stringify(players));
   const payload = btoa(JSON.stringify(players));
+  localStorage.setItem('wcf_players', JSON.stringify(players));
   history.pushState({}, '', location.pathname + '?league=' + payload);
 }
 
@@ -307,6 +316,7 @@ function loadState() {
   return false;
 }
 
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
 function setStatus(type, msg) {
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
@@ -379,8 +389,9 @@ function formatDate(utc) {
   return new Date(utc).toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 }
 
+// ── FETCH ─────────────────────────────────────────────────────────────────────
 async function fetchAndUpdate() {
-  setStatus('loading', 'Updating matches...');
+  setStatus('loading', 'Fetching live data...');
   const btn  = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
   if (btn)  btn.disabled = true;
@@ -393,11 +404,8 @@ async function fetchAndUpdate() {
     const res = await fetch(WORKER_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     parsed = await res.json();
-  } catch(e) { 
-    errMsg = e.message; 
-  }
+  } catch(e) { errMsg = e.message; }
 
-  // If parsed data contains matches (even if empty due to 403 fallback), load peacefully
   if (parsed && parsed.matches) {
     try {
       const converted = parsed.matches.map(m => {
@@ -405,11 +413,8 @@ async function fetchAndUpdate() {
         const awayScore = m.score?.fullTime?.away ?? null;
 
         let status = 'scheduled';
-        if (m.status === 'FINISHED') {
-          status = 'finished';
-        } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
-          status = 'live';
-        }
+        if      (m.status === 'FINISHED')                           status = 'finished';
+        else if (m.status === 'IN_PLAY' || m.status === 'PAUSED')  status = 'live';
 
         const isAeT = m.score?.duration === 'EXTRA_TIME' || m.score?.duration === 'PENALTY_SHOOTOUT';
 
@@ -417,12 +422,16 @@ async function fetchAndUpdate() {
           ? m.group.replace('GROUP_', 'Group ')
           : (m.stage || '').replace(/_/g, ' ');
 
+        // EXTRACT CUSTOM RED CARD PAYLOAD ATTACHED BY THE UPDATED CLOUDFLARE WORKER
+        const homeRed = m.customRedCards?.home || 0;
+        const awayRed = m.customRedCards?.away || 0;
+
         return {
           homeTeam: m.homeTeam?.name || 'TBD',
           awayTeam: m.awayTeam?.name || 'TBD',
           homeScore, awayScore, status, aeT: isAeT,
           stage: stageLabel, date: m.utcDate,
-          redCards: { home: 0, away: 0 }
+          redCards: { home: homeRed, away: awayRed }
         };
       });
 
@@ -441,9 +450,8 @@ async function fetchAndUpdate() {
       setStatus('error', 'Parse error: ' + err.message);
     }
   } else {
-    // Graceful safety net response if data completely blocks out
-    setStatus('ok', 'Offline Mode (Using saved rosters)');
-    document.getElementById('headerSub').textContent = 'Tournament data feed suspended';
+    setStatus('error', 'Could not load data (' + (errMsg || 'unknown') + ')');
+    document.getElementById('headerSub').textContent = 'Live data unavailable';
     buildScoredPlayers();
     renderAll();
   }
@@ -452,14 +460,16 @@ async function fetchAndUpdate() {
   if (icon) icon.classList.remove('spin');
 }
 
+// ── SCORING ───────────────────────────────────────────────────────────────────
 function getMatchPointsForTeam(teamName, m) {
   const isHome = norm(m.homeTeam) === norm(teamName);
   const isAway = norm(m.awayTeam) === norm(teamName);
   if (!isHome && !isAway) return 0;
   if (m.status !== 'finished' && m.status !== 'live') return 0;
 
-  const self = isHome ? m.homeScore : m.awayScore;
-  const opp  = isHome ? m.awayScore : m.homeScore;
+  const self   = isHome ? m.homeScore : m.awayScore;
+  const opp    = isHome ? m.awayScore : m.homeScore;
+  const redCds = isHome ? (m.redCards?.home || 0) : (m.redCards?.away || 0);
 
   let pts = 0;
   if (self > opp) {
@@ -469,6 +479,7 @@ function getMatchPointsForTeam(teamName, m) {
     pts += 1;
   }
   if (opp === 0) pts += 0.5;
+  pts -= redCds;
   return pts;
 }
 
@@ -478,8 +489,10 @@ function getMatchPointsBreakdown(teamName, m) {
   if (!isHome && !isAway) return null;
   if (m.status !== 'finished' && m.status !== 'live') return null;
 
-  const self = isHome ? m.homeScore : m.awayScore;
-  const opp  = isHome ? m.awayScore : m.homeScore;
+  const self   = isHome ? m.homeScore : m.awayScore;
+  const opp    = isHome ? m.awayScore : m.homeScore;
+  const redCds = isHome ? (m.redCards?.home || 0) : (m.redCards?.away || 0);
+  const opp_name = isHome ? m.awayTeam : m.homeTeam;
   const parts  = [];
   let pts = 0;
 
@@ -494,8 +507,9 @@ function getMatchPointsBreakdown(teamName, m) {
     parts.push('Loss');
   }
   if (opp === 0) { pts += 0.5; parts.push('Clean sheet +0.5'); }
+  if (redCds > 0) { pts -= redCds; parts.push('Red card(s) -' + redCds); }
 
-  return { pts, detail: parts.join(' · '), scoreStr: self + '-' + opp };
+  return { pts, detail: parts.join(' · '), scoreStr: self + '-' + opp, opp: opp_name };
 }
 
 function calculateTeamTotalPoints(teamName) {
@@ -525,6 +539,7 @@ function getOwners(teamName) {
   return scoredPlayers.filter(p => p.breakdown.some(b => norm(b.team) === norm(teamName)));
 }
 
+// ── TEAM DETAIL MODAL ─────────────────────────────────────────────────────────
 function openTeamModal(teamName, ownerName) {
   const modal = document.getElementById('teamModal');
   document.getElementById('modalTeamName').textContent = teamName;
@@ -559,6 +574,18 @@ function openTeamModal(teamName, ownerName) {
         <div class="breakdown-pts ${bd.pts === 0 ? 'zero' : ''}">${fmtPts(bd.pts)} pts</div>`;
       listEl.appendChild(row);
     });
+
+    const bonuses = [];
+    gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) bonuses.push({ label: 'Qualified from group', pts: 0.5 }); });
+    if (norm(gameData.goldenBoot)       === norm(teamName)) bonuses.push({ label: 'Golden Boot', pts: 1 });
+    if (norm(gameData.goalOfTournament) === norm(teamName)) bonuses.push({ label: 'Goal of Tournament', pts: 1 });
+    if (norm(gameData.youngPlayer)      === norm(teamName)) bonuses.push({ label: 'Young Player of Tournament', pts: 1 });
+    bonuses.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'breakdown-row';
+      row.innerHTML = `<div style="flex:1"><div class="breakdown-match">${b.label}</div></div><div class="breakdown-pts">${fmtPts(b.pts)} pts</div>`;
+      listEl.appendChild(row);
+    });
   }
 
   modal.style.display = 'flex';
@@ -576,6 +603,7 @@ function closeModalOnBackdrop(e) {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+// ── RENDER ────────────────────────────────────────────────────────────────────
 function renderAll() {
   renderLeaderboard();
   renderLiveRecent();
@@ -656,7 +684,7 @@ function renderLiveRecent() {
   c.innerHTML = '';
   const list = gameData.matches.filter(m => m.status === 'live' || m.status === 'finished');
   if (!list.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No match data in current window.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No matches yet.</div>';
     return;
   }
   const live     = list.filter(m => m.status === 'live');
@@ -668,7 +696,7 @@ function renderMatches() {
   const c = document.getElementById('matchesContainer');
   c.innerHTML = '';
 
-  const live = gameData.matches.filter(m => m.status === 'live');
+  const live      = gameData.matches.filter(m => m.status === 'live');
   const scheduled = gameData.matches.filter(m => m.status === 'scheduled');
 
   if (!live.length && !scheduled.length) {
@@ -691,7 +719,7 @@ function renderMatches() {
   if (scheduled.length) {
     const upLabel = document.createElement('div');
     upLabel.className = 'section-label';
-    upLabel.textContent = 'Upcoming Matches';
+    upLabel.textContent = 'Upcoming';
     c.appendChild(upLabel);
     const upList = document.createElement('div');
     upList.className = 'match-list';
@@ -705,7 +733,7 @@ function renderResults() {
   c.innerHTML = '';
   const list = gameData.matches.filter(m => m.status === 'finished');
   if (!list.length) {
-    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No matches complete.</div>';
+    c.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:0.9rem;">No results yet.</div>';
     return;
   }
   [...list].reverse().forEach(m => c.appendChild(buildMatchCard(m, true)));
@@ -754,6 +782,7 @@ function renderMatrix() {
   c.innerHTML = html + `</tbody></table>`;
 }
 
+// ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   if (loadState() && players.length >= 2) {
     document.getElementById('playerInputs').innerHTML = '';
