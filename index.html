@@ -423,8 +423,12 @@ async function fetchAndUpdate() {
           : (m.stage || '').replace(/_/g, ' ');
 
         // EXTRACT CUSTOM RED CARD PAYLOAD ATTACHED BY THE UPDATED CLOUDFLARE WORKER
-        const homeRed = m.customRedCards?.home || 0;
-        const awayRed = m.customRedCards?.away || 0;
+        // const homeRed = m.customRedCards?.home || 0;
+        // const awayRed = m.customRedCards?.away || 0;
+        
+        // EXTRACT RED CARD PAYLOAD ATTACHED BY THE CLOUDFLARE WORKER
+        const homeRed = m.redCards?.home ?? m.customRedCards?.home ?? 0;
+        const awayRed = m.redCards?.away ?? m.customRedCards?.away ?? 0;
 
         return {
           homeTeam: m.homeTeam?.name || 'TBD',
