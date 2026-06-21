@@ -79,6 +79,9 @@
   .m-status.live      { background: rgba(232,64,64,0.2); color: var(--accent2); animation: pulse 1s infinite; }
   .m-status.scheduled { background: rgba(245,166,35,0.1); color: var(--accent); }
 
+  /* Red card display labels */
+  .card-indicator { display: inline-flex; align-items: center; background: #c21818; color: #fff; padding: 0.1rem 0.35rem; font-size: 0.68rem; font-weight: bold; border-radius: 3px; margin: 0 0.25rem; vertical-align: middle; }
+
   /* Player ownership badges on match cards */
   .ownership-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
   .owner-badge { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 12px; background: rgba(245,166,35,0.12); color: var(--accent); border: 1px solid rgba(245,166,35,0.25); }
@@ -104,6 +107,15 @@
   .rule-pts.pos { color: var(--green); }
   .rule-pts.neg { color: var(--accent2); }
   .rule-section { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; color: var(--muted); letter-spacing: 1px; margin: 1.25rem 0 0.5rem; text-transform: uppercase; }
+
+  /* Log Manager System UI */
+  .admin-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  .admin-table th, .admin-table td { padding: 0.75rem; text-align: center; border-bottom: 1px solid var(--border); }
+  .admin-table th { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--muted); }
+  .counter-ctrl { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--card); padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); }
+  .btn-counter { background: rgba(255,255,255,0.08); border: none; color: #fff; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; cursor: pointer; }
+  .btn-counter:hover { background: var(--accent); color: var(--bg); }
+  .counter-val { font-weight: 600; font-size: 1rem; min-width: 16px; text-align: center; }
 
   /* Team detail modal */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; overflow-y: auto; animation: fadeIn 0.2s ease; }
@@ -206,6 +218,7 @@
       <button class="tab-btn"        onclick="switchTab(event,'resultsTab')">Results</button>
       <button class="tab-btn"        onclick="switchTab(event,'matrixTab')">Head-to-Head</button>
       <button class="tab-btn"        onclick="switchTab(event,'rulesTab')">Rules</button>
+      <button class="tab-btn"        onclick="switchTab(event,'adminTab')" style="border-left:1px dashed var(--border); padding-left:1.5rem; color:var(--accent)">Red Cards Admin</button>
     </nav>
 
     <div id="leaderboardTab" class="tab-content active">
@@ -264,6 +277,26 @@
         </div>
       </div>
     </div>
+
+    <!-- Administrative Logging Tool Panel -->
+    <div id="adminTab" class="tab-content">
+      <div class="card">
+        <div class="card-title">Red Cards Logger</div>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Since the free tier API omits bookings payload events, log any red cards issued during live games here. Real-time updates apply directly to table standings and matrix tabs instantly.</p>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Match Description</th>
+                <th>Home Team Red Cards</th>
+                <th>Away Team Red Cards</th>
+              </tr>
+            </thead>
+            <tbody id="adminLoggingContainer"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -284,28 +317,49 @@ const API_KEY           = '01c0a0cdc86a441aa5c96ac0f075b184';
 const WC_COMPETITION_ID = 2000;
 const WORKER_URL        = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
 
+// List of all eligible tournament teams to build "Unselected" tracking list
+const MASTER_TEAMS_LIST = [
+  "Argentina","Australia","Austria","Belgium","Bosnia and Herzegovina","Brazil","Canada","Cape Verde",
+  "Colombia","Croatia","Czech Republic","DR Congo","Ecuador","Egypt","England","France","Germany",
+  "Ghana","Haiti","Iran","Iraq","Ivory Coast","Japan","Jordan","Mexico","Morocco","Netherlands",
+  "New Zealand","Norway","Panama","Paraguay","Portugal","Qatar","Saudi Arabia","Scotland","Senegal",
+  "South Africa","South Korea","Spain","Sweden","Switzerland","Tunisia","Turkey","United States",
+  "Uruguay","Uzbekistan","Curacao"
+];
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let players       = [];
 let gameData      = { matches: [], qualified: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
 let scoredPlayers = [];
 let playerCount   = 0;
+let localRedCards = {}; // Structure payload record: { [matchId]: { home: 0, away: 0 } }
 
 function norm(t) { 
   if (!t) return '';
-  return t.trim()
-          .toLowerCase()
-          .replace(/\band\b/g, '')
-          .replace(/&/g, '')
-          .replace(/[^a-z0-9]/g, '');
+  let val = t.trim().toLowerCase();
+  // FIXED CZECHIA / CZECH REPUBLIC MAPPING CONFLICT RULES HERE
+  if (val === 'czechia' || val === 'czechrepublic') {
+    return 'czechrepublic';
+  }
+  return val.replace(/\band\b/g, '')
+            .replace(/&/g, '')
+            .replace(/[^a-z0-9]/g, '');
 }
 
 function saveState() {
   const payload = btoa(JSON.stringify(players));
   localStorage.setItem('wcf_players', JSON.stringify(players));
+  localStorage.setItem('wcf_red_cards', JSON.stringify(localRedCards));
   history.pushState({}, '', location.pathname + '?league=' + payload);
 }
 
 function loadState() {
+  // Load local administrative records
+  const savedRedCards = localStorage.getItem('wcf_red_cards');
+  if (savedRedCards) {
+    try { localRedCards = JSON.parse(savedRedCards); } catch(e) { localRedCards = {}; }
+  }
+
   const shared = new URLSearchParams(location.search).get('league');
   if (shared) {
     try { players = JSON.parse(atob(shared)); localStorage.setItem('wcf_players', JSON.stringify(players)); return true; }
@@ -355,8 +409,10 @@ function removePlayerInput(id) { const r = document.getElementById('pRow_'+id); 
 function editTeams() {
   document.getElementById('playerInputs').innerHTML = '';
   playerCount = 0;
-  players.forEach(p => addPlayerInput(p));
-  if (!players.length) { addPlayerInput(); addPlayerInput(); }
+  // Exclude programmatic Unselected layer when opening management wizard
+  const humanPlayers = players.filter(p => p.name !== 'Unselected');
+  humanPlayers.forEach(p => addPlayerInput(p));
+  if (!humanPlayers.length) { addPlayerInput(); addPlayerInput(); }
   document.getElementById('setupOverlay').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 }
@@ -367,7 +423,7 @@ function launchDashboard() {
   rows.forEach(r => {
     const name  = r.querySelector('.p-name-input').value.trim();
     const teams = [...r.querySelectorAll('.teams-selection-grid input')].map(i => i.value.trim()).filter(Boolean);
-    if (name) out.push({ name, teams });
+    if (name && name !== 'Unselected') out.push({ name, teams });
   });
   if (out.length < 2) { alert('You need at least 2 players.'); return; }
   players = out;
@@ -422,31 +478,17 @@ async function fetchAndUpdate() {
           ? m.group.replace('GROUP_', 'Group ')
           : (m.stage || '').replace(/_/g, ' ');
 
-        // EXTRACT CUSTOM RED CARD PAYLOAD ATTACHED BY THE UPDATED CLOUDFLARE WORKER
-        // const homeRed = m.customRedCards?.home || 0;
-        // const awayRed = m.customRedCards?.away || 0;
-        
-        // EXTRACT RED CARD PAYLOAD ATTACHED BY THE CLOUDFLARE WORKER
-        let homeRed = 0;
-        let awayRed = 0;
-        if (m.bookings && Array.isArray(m.bookings)) {
-          m.bookings.forEach(b => {
-            if (b.card === 'RED' || b.card === 'YELLOW_RED') {
-              if (b.team?.id === m.homeTeam?.id || b.team?.name === m.homeTeam?.name) {
-                homeRed++;
-              } else if (b.team?.id === m.awayTeam?.id || b.team?.name === m.awayTeam?.name) {
-                awayRed++;
-              }
-            }
-          });
-        }
+        // UNIFY SEAMLESS INTEGRATION WITH ADMINISTRATIVE CARD OVERRIDES MAP LOGIC
+        const matchId = String(m.id);
+        const loggedCards = localRedCards[matchId] || { home: 0, away: 0 };
 
         return {
+          id: matchId,
           homeTeam: m.homeTeam?.name || 'TBD',
           awayTeam: m.awayTeam?.name || 'TBD',
           homeScore, awayScore, status, aeT: isAeT,
           stage: stageLabel, date: m.utcDate,
-          redCards: { home: homeRed, away: awayRed }
+          redCards: { home: loggedCards.home, away: loggedCards.away }
         };
       });
 
@@ -538,6 +580,26 @@ function calculateTeamTotalPoints(teamName) {
 }
 
 function buildScoredPlayers() {
+  // Clear any existing computed Unselected element first
+  players = players.filter(p => p.name !== 'Unselected');
+
+  // Identify all teams claimed by active human participants
+  const claimedNormalized = new Set();
+  players.forEach(p => {
+    p.teams.forEach(t => { if(t) claimedNormalized.add(norm(t)); });
+  });
+
+  // Collect everything else left behind inside master tournament selection index
+  const unselectedTeams = MASTER_TEAMS_LIST.filter(t => !claimedNormalized.has(norm(t)));
+
+  // Programmatically inject Unselected ghost entity wrapper
+  if (unselectedTeams.length > 0) {
+    players.push({
+      name: 'Unselected',
+      teams: unselectedTeams
+    });
+  }
+
   scoredPlayers = players.map(p => {
     let total = 0;
     const breakdown = p.teams.map(t => {
@@ -547,11 +609,17 @@ function buildScoredPlayers() {
     });
     return { name: p.name, total, breakdown };
   });
-  scoredPlayers.sort((a, b) => b.total - a.total);
+
+  // Sort: keep general scores ranked high, but keep 'Unselected' pinned at the absolute bottom
+  scoredPlayers.sort((a, b) => {
+    if (a.name === 'Unselected') return 1;
+    if (b.name === 'Unselected') return -1;
+    return b.total - a.total;
+  });
 }
 
 function getOwners(teamName) {
-  return scoredPlayers.filter(p => p.breakdown.some(b => norm(b.team) === norm(teamName)));
+  return scoredPlayers.filter(p => p.name !== 'Unselected' && p.breakdown.some(b => norm(b.team) === norm(teamName)));
 }
 
 // ── TEAM DETAIL MODAL ─────────────────────────────────────────────────────────
@@ -618,6 +686,71 @@ function closeModalOnBackdrop(e) {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+// ── ADMIN MODERATION LOGIC ──────────────────────────────────────────────────
+function updateCardCounter(matchId, field, delta) {
+  if (!localRedCards[matchId]) {
+    localRedCards[matchId] = { home: 0, away: 0 };
+  }
+  
+  localRedCards[matchId][field] = Math.max(0, localRedCards[matchId][field] + delta);
+  localStorage.setItem('wcf_red_cards', JSON.stringify(localRedCards));
+
+  // Update live configuration memory reference inside active match state array instances
+  const tgtMatch = gameData.matches.find(m => m.id === matchId);
+  if (tgtMatch) {
+    tgtMatch.redCards[field] = localRedCards[matchId][field];
+  }
+
+  // Recalculate score matrix and update user dashboard interface views seamlessly
+  document.getElementById(`val_${matchId}_${field}`).textContent = localRedCards[matchId][field];
+  buildScoredPlayers();
+  renderAll();
+}
+
+function renderAdminLogger() {
+  const container = document.getElementById('adminLoggingContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // Sort matches chronologically, keeping relevant live/finished ones searchable at top
+  const sortedMatches = [...gameData.matches].sort((a,b) => {
+    if (a.status === 'live' && b.status !== 'live') return -1;
+    if (b.status === 'live' && a.status !== 'live') return 1;
+    return new Date(b.date) - new Date(a.date);
+  });
+
+  if (!sortedMatches.length) {
+    container.innerHTML = '<tr><td colspan="3" style="color:var(--muted); padding:2rem;">No matches synchronized yet. Connect to the server pipeline to load records.</td></tr>';
+    return;
+  }
+
+  sortedMatches.forEach(m => {
+    const cardData = localRedCards[m.id] || { home: 0, away: 0 };
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="text-align:left;">
+        <span style="font-size:0.75rem; color:var(--muted); display:block;">${m.stage} · ${m.status.toUpperCase()}</span>
+        <strong>${m.homeTeam} vs ${m.awayTeam}</strong>
+      </td>
+      <td>
+        <div class="counter-ctrl">
+          <button class="btn-counter" onclick="updateCardCounter('${m.id}', 'home', -1)">-</button>
+          <span class="counter-val" id="val_${m.id}_home">${cardData.home}</span>
+          <button class="btn-counter" onclick="updateCardCounter('${m.id}', 'home', 1)">+</button>
+        </div>
+      </td>
+      <td>
+        <div class="counter-ctrl">
+          <button class="btn-counter" onclick="updateCardCounter('${m.id}', 'away', -1)">-</button>
+          <span class="counter-val" id="val_${m.id}_away">${cardData.away}</span>
+          <button class="btn-counter" onclick="updateCardCounter('${m.id}', 'away', 1)">+</button>
+        </div>
+      </td>
+    `;
+    container.appendChild(tr);
+  });
+}
+
 // ── RENDER ────────────────────────────────────────────────────────────────────
 function renderAll() {
   renderLeaderboard();
@@ -625,19 +758,26 @@ function renderAll() {
   renderMatches();
   renderResults();
   renderMatrix();
+  renderAdminLogger();
 }
 
 function renderLeaderboard() {
   const c = document.getElementById('leaderboardContainer');
   c.innerHTML = '';
   scoredPlayers.forEach((p, i) => {
-    const rankCls = i < 3 ? 'rank-' + (i+1) : '';
+    const isUnselected = p.name === 'Unselected';
+    const rankDisplay = isUnselected ? '—' : (i + 1);
+    const rankCls = (!isUnselected && i < 3) ? 'rank-' + (i+1) : '';
+    
+    // Dim the color presentation properties slightly if rendering the Unselected team collection
+    const extraStyle = isUnselected ? 'style="opacity: 0.65; border-left: 3px dashed var(--muted);"' : '';
+
     const div = document.createElement('div');
     div.innerHTML = `
-      <div class="leader-item" onclick="toggleRoster('roster_${i}')">
+      <div class="leader-item" ${extraStyle} onclick="toggleRoster('roster_${i}')">
         <div class="leader-left">
-          <div class="rank ${rankCls}">${i+1}</div>
-          <div class="player-name">${p.name}</div>
+          <div class="rank ${rankCls}">${rankDisplay}</div>
+          <div class="player-name">${p.name} ${isUnselected ? '<span style="font-size:0.8rem; color:var(--muted); font-weight:normal;">(Pool of remaining teams)</span>' : ''}</div>
         </div>
         <div class="points-display">
           <div class="total-pts">${fmtPts(p.total)}</div>
@@ -658,6 +798,9 @@ function renderLeaderboard() {
 }
 
 function buildMatchCard(m, showOwnership) {
+  const homeCardsLabel = m.redCards?.home > 0 ? `<span class="card-indicator">🟥 ${m.redCards.home}</span>` : '';
+  const awayCardsLabel = m.redCards?.away > 0 ? `<span class="card-indicator">🟥 ${m.redCards.away}</span>` : '';
+
   const score   = (m.homeScore !== null && m.awayScore !== null) ? m.homeScore + ' - ' + m.awayScore : 'vs';
   const aet     = m.aeT ? ' <span style="font-size:0.65rem;color:var(--muted);">AeT</span>' : '';
   const label   = m.status === 'finished' ? 'FT' : m.status === 'live' ? 'LIVE' : formatDate(m.date);
@@ -684,9 +827,9 @@ function buildMatchCard(m, showOwnership) {
     <div style="width:100%">
       <div class="match-stage">${m.stage}</div>
       <div class="match-main">
-        <div class="m-team home">${m.homeTeam}</div>
+        <div class="m-team home">${m.homeTeam} ${homeCardsLabel}</div>
         <div class="m-score-area">${score}${aet}</div>
-        <div class="m-team away">${m.awayTeam}</div>
+        <div class="m-team away">${awayCardsLabel} ${m.awayTeam}</div>
       </div>
       ${ownershipHtml}
       <div class="m-status ${m.status}">${label}</div>
@@ -799,7 +942,7 @@ function renderMatrix() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-  if (loadState() && players.length >= 2) {
+  if (loadState() && players.filter(p => p.name !== 'Unselected').length >= 2) {
     document.getElementById('playerInputs').innerHTML = '';
     playerCount = 0;
     document.getElementById('setupOverlay').style.display = 'none';
