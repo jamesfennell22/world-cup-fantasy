@@ -51,7 +51,7 @@
   .total-pts { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: var(--accent); line-height: 1; }
   .pts-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
   .roster-breakdown { margin-top: 0.5rem; display: none; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); }
-  .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }
+  .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; }
 
   /* Clickable team cards */
   .team-tag {
@@ -124,7 +124,7 @@
   .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 1px; }
   .modal-close { background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; line-height: 1; padding: 0.25rem; }
   .modal-close:hover { color: #fff; }
-  .modal-total { font-size: 0.9rem; color: var(--muted); margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .modal-total { font-size: 0.9rem; color: var(--muted); margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); line-height: 1.5; }
   .modal-total strong { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; color: var(--accent); }
   .match-breakdown-list { display: flex; flex-direction: column; gap: 0.6rem; }
   .breakdown-row { background: var(--card); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -337,10 +337,13 @@ let localRedCards = {}; // Structure payload record: { [matchId]: { home: 0, awa
 function norm(t) { 
   if (!t) return '';
   let val = t.trim().toLowerCase();
-  // FIXED CZECHIA / CZECH REPUBLIC MAPPING CONFLICT RULES HERE
-  if (val === 'czechia' || val === 'czechrepublic') {
-    return 'czechrepublic';
-  }
+  
+  // Normalized conflict map adjustments to support cross-provider strings seamlessly
+  if (val === 'czechia' || val === 'czechrepublic') return 'czechrepublic';
+  if (val === 'cape verde' || val === 'cabo verde' || val === 'capeverde' || val === 'caboverde') return 'capeverde';
+  if (val === 'dr congo' || val === 'congo dr' || val === 'drcongo' || val === 'congodr' || val.includes('democratic republic of the congo')) return 'drcongo';
+  if (val === 'curacao' || val === 'curaçao') return 'curacao';
+  
   return val.replace(/\band\b/g, '')
             .replace(/&/g, '')
             .replace(/[^a-z0-9]/g, '');
@@ -579,6 +582,13 @@ function calculateTeamTotalPoints(teamName) {
   return pts;
 }
 
+function getTeamMatchesPlayedCount(teamName) {
+  return gameData.matches.filter(m =>
+    (norm(m.homeTeam) === norm(teamName) || norm(m.awayTeam) === norm(teamName)) &&
+    (m.status === 'finished' || m.status === 'live')
+  ).length;
+}
+
 function buildScoredPlayers() {
   // Clear any existing computed Unselected element first
   players = players.filter(p => p.name !== 'Unselected');
@@ -602,12 +612,15 @@ function buildScoredPlayers() {
 
   scoredPlayers = players.map(p => {
     let total = 0;
+    let totalMatchesPlayed = 0;
     const breakdown = p.teams.map(t => {
       const tPts = calculateTeamTotalPoints(t);
+      const mPlayed = getTeamMatchesPlayedCount(t);
       total += tPts;
-      return { team: t, points: tPts };
+      totalMatchesPlayed += mPlayed;
+      return { team: t, points: tPts, played: mPlayed };
     });
-    return { name: p.name, total, breakdown };
+    return { name: p.name, total, breakdown, totalMatchesPlayed };
   });
 
   // Sort: keep general scores ranked high, but keep 'Unselected' pinned at the absolute bottom
@@ -628,8 +641,11 @@ function openTeamModal(teamName, ownerName) {
   document.getElementById('modalTeamName').textContent = teamName;
 
   const totalPts = calculateTeamTotalPoints(teamName);
+  const playedCount = getTeamMatchesPlayedCount(teamName);
+  
   document.getElementById('modalTeamTotal').innerHTML =
-    'Owned by <strong>' + ownerName + '</strong> &nbsp;·&nbsp; Total: <strong>' + fmtPts(totalPts) + ' pts</strong>';
+    'Owned by <strong>' + ownerName + '</strong> &nbsp;·&nbsp; Total: <strong>' + fmtPts(totalPts) + ' pts</strong><br>' +
+    '<span style="font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; display: inline-block;">Matches Played: <strong>' + playedCount + '</strong></span>';
 
   const listEl = document.getElementById('modalMatchList');
   listEl.innerHTML = '';
@@ -777,7 +793,10 @@ function renderLeaderboard() {
       <div class="leader-item" ${extraStyle} onclick="toggleRoster('roster_${i}')">
         <div class="leader-left">
           <div class="rank ${rankCls}">${rankDisplay}</div>
-          <div class="player-name">${p.name} ${isUnselected ? '<span style="font-size:0.8rem; color:var(--muted); font-weight:normal;">(Pool of remaining teams)</span>' : ''}</div>
+          <div>
+            <div class="player-name">${p.name} ${isUnselected ? '<span style="font-size:0.8rem; color:var(--muted); font-weight:normal;">(Pool of remaining teams)</span>' : ''}</div>
+            <div style="font-size:0.75rem; color:var(--muted); margin-top:0.2rem;">Combined Matches Played: <strong>${p.totalMatchesPlayed}</strong></div>
+          </div>
         </div>
         <div class="points-display">
           <div class="total-pts">${fmtPts(p.total)}</div>
@@ -789,7 +808,7 @@ function renderLeaderboard() {
           ${p.breakdown.map(b => `
             <div class="team-tag" onclick="event.stopPropagation(); openTeamModal('${b.team.replace(/'/g,"\\'")}', '${p.name.replace(/'/g,"\\'")}')">
               <span class="t-name">${b.team||'—'}</span>
-              <span class="t-pts">${fmtPts(b.points)} pts</span>
+              <span class="t-pts">${fmtPts(b.points)} pts (${b.played} MP)</span>
             </div>`).join('')}
         </div>
       </div>`;
