@@ -427,8 +427,19 @@ async function fetchAndUpdate() {
         // const awayRed = m.customRedCards?.away || 0;
         
         // EXTRACT RED CARD PAYLOAD ATTACHED BY THE CLOUDFLARE WORKER
-        const homeRed = m.redCards?.home ?? m.customRedCards?.home ?? 0;
-        const awayRed = m.redCards?.away ?? m.customRedCards?.away ?? 0;
+        let homeRed = 0;
+        let awayRed = 0;
+        if (m.bookings && Array.isArray(m.bookings)) {
+          m.bookings.forEach(b => {
+            if (b.card === 'RED' || b.card === 'YELLOW_RED') {
+              if (b.team?.id === m.homeTeam?.id || b.team?.name === m.homeTeam?.name) {
+                homeRed++;
+              } else if (b.team?.id === m.awayTeam?.id || b.team?.name === m.awayTeam?.name) {
+                awayRed++;
+              }
+            }
+          });
+        }
 
         return {
           homeTeam: m.homeTeam?.name || 'TBD',
