@@ -155,6 +155,12 @@
   button.btn-block { width: 100%; justify-content: center; font-size: 1.1rem; padding: 1rem; margin-top: 1rem; }
   .ctrl-bar { margin-bottom: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
   .spin { animation: rotation 1s infinite linear; }
+  
+  /* Admin Submission Bar Layout styling elements */
+  .admin-save-bar { display: flex; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  .btn-submit { background: var(--green); color: var(--bg); border: none; padding: 0.6rem 1.5rem; font-size: 0.9rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+  .btn-submit:hover { opacity: 0.9; }
+
   @keyframes rotation { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @keyframes pulse    { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
   @keyframes fadeIn   { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -282,7 +288,7 @@
     <div id="adminTab" class="tab-content">
       <div class="card">
         <div class="card-title">Red Cards Logger</div>
-        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Since the free tier API omits bookings payload events, log any red cards issued during live games here. Real-time updates apply directly to table standings and matrix tabs instantly.</p>
+        <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Log red cards issued during live games here. These changes will sync to Cloudflare KV and apply directly to standings globally across all users.</p>
         <div class="table-responsive">
           <table class="admin-table">
             <thead>
@@ -294,6 +300,9 @@
             </thead>
             <tbody id="adminLoggingContainer"></tbody>
           </table>
+        </div>
+        <div class="admin-save-bar">
+          <button class="btn-submit" onclick="syncRedCardsToCloudflare()">Save &amp; Sync Overrides</button>
         </div>
       </div>
     </div>
@@ -352,17 +361,10 @@ function norm(t) {
 function saveState() {
   const payload = btoa(JSON.stringify(players));
   localStorage.setItem('wcf_players', JSON.stringify(players));
-  localStorage.setItem('wcf_red_cards', JSON.stringify(localRedCards));
   history.pushState({}, '', location.pathname + '?league=' + payload);
 }
 
 function loadState() {
-  // Load local administrative records
-  const savedRedCards = localStorage.getItem('wcf_red_cards');
-  if (savedRedCards) {
-    try { localRedCards = JSON.parse(savedRedCards); } catch(e) { localRedCards = {}; }
-  }
-
   const shared = new URLSearchParams(location.search).get('league');
   if (shared) {
     try { players = JSON.parse(atob(shared)); localStorage.setItem('wcf_players', JSON.stringify(players)); return true; }
@@ -412,7 +414,6 @@ function removePlayerInput(id) { const r = document.getElementById('pRow_'+id); 
 function editTeams() {
   document.getElementById('playerInputs').innerHTML = '';
   playerCount = 0;
-  // Exclude programmatic Unselected layer when opening management wizard
   const humanPlayers = players.filter(p => p.name !== 'Unselected');
   humanPlayers.forEach(p => addPlayerInput(p));
   if (!humanPlayers.length) { addPlayerInput(); addPlayerInput(); }
@@ -465,8 +466,12 @@ async function fetchAndUpdate() {
     parsed = await res.json();
   } catch(e) { errMsg = e.message; }
 
+  // FIX: Unpack the new { matches: [], savedRedCards: {} } object blueprint wrapper structure cleanly
   if (parsed && parsed.matches) {
     try {
+      // Retain the structural state map overrides delivered from Cloudflare global storage
+      localRedCards = parsed.savedRedCards || {};
+
       const converted = parsed.matches.map(m => {
         const homeScore = m.score?.fullTime?.home ?? null;
         const awayScore = m.score?.fullTime?.away ?? null;
@@ -481,17 +486,13 @@ async function fetchAndUpdate() {
           ? m.group.replace('GROUP_', 'Group ')
           : (m.stage || '').replace(/_/g, ' ');
 
-        // UNIFY SEAMLESS INTEGRATION WITH ADMINISTRATIVE CARD OVERRIDES MAP LOGIC
-        const matchId = String(m.id);
-        const loggedCards = localRedCards[matchId] || { home: 0, away: 0 };
-
         return {
-          id: matchId,
+          id: String(m.id),
           homeTeam: m.homeTeam?.name || 'TBD',
           awayTeam: m.awayTeam?.name || 'TBD',
           homeScore, awayScore, status, aeT: isAeT,
           stage: stageLabel, date: m.utcDate,
-          redCards: { home: loggedCards.home, away: loggedCards.away }
+          redCards: { home: m.redCards?.home ?? 0, away: m.redCards?.away ?? 0 }
         };
       });
 
@@ -590,19 +591,15 @@ function getTeamMatchesPlayedCount(teamName) {
 }
 
 function buildScoredPlayers() {
-  // Clear any existing computed Unselected element first
   players = players.filter(p => p.name !== 'Unselected');
 
-  // Identify all teams claimed by active human participants
   const claimedNormalized = new Set();
   players.forEach(p => {
     p.teams.forEach(t => { if(t) claimedNormalized.add(norm(t)); });
   });
 
-  // Collect everything else left behind inside master tournament selection index
   const unselectedTeams = MASTER_TEAMS_LIST.filter(t => !claimedNormalized.has(norm(t)));
 
-  // Programmatically inject Unselected ghost entity wrapper
   if (unselectedTeams.length > 0) {
     players.push({
       name: 'Unselected',
@@ -623,7 +620,6 @@ function buildScoredPlayers() {
     return { name: p.name, total, breakdown, totalMatchesPlayed };
   });
 
-  // Sort: keep general scores ranked high, but keep 'Unselected' pinned at the absolute bottom
   scoredPlayers.sort((a, b) => {
     if (a.name === 'Unselected') return 1;
     if (b.name === 'Unselected') return -1;
@@ -709,18 +705,39 @@ function updateCardCounter(matchId, field, delta) {
   }
   
   localRedCards[matchId][field] = Math.max(0, localRedCards[matchId][field] + delta);
-  localStorage.setItem('wcf_red_cards', JSON.stringify(localRedCards));
 
-  // Update live configuration memory reference inside active match state array instances
+  // Instantly apply metrics directly to current local runtime instance matches array
   const tgtMatch = gameData.matches.find(m => m.id === matchId);
   if (tgtMatch) {
     tgtMatch.redCards[field] = localRedCards[matchId][field];
   }
 
-  // Recalculate score matrix and update user dashboard interface views seamlessly
   document.getElementById(`val_${matchId}_${field}`).textContent = localRedCards[matchId][field];
   buildScoredPlayers();
   renderAll();
+}
+
+// NEW: Transmit the entire administrative card payload matrix down to your Cloudflare KV network endpoint
+async function syncRedCardsToCloudflare() {
+  setStatus('loading', 'Syncing overrides to Cloudflare...');
+  try {
+    const res = await fetch(`${WORKER_URL}api/save-red-cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ redCardsData: localRedCards })
+    });
+    
+    if (!res.ok) throw new Error('Failed to update cloud network data state values.');
+    const result = await res.json();
+    if (result.success) {
+      alert('Red cards synchronized globally across all dashboards successfully!');
+      fetchAndUpdate();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Error connecting with Cloudflare worker instance matrix configuration strings: ' + err.message);
+    setStatus('error', 'Sync failed');
+  }
 }
 
 function renderAdminLogger() {
@@ -728,7 +745,6 @@ function renderAdminLogger() {
   if (!container) return;
   container.innerHTML = '';
 
-  // Sort matches chronologically, keeping relevant live/finished ones searchable at top
   const sortedMatches = [...gameData.matches].sort((a,b) => {
     if (a.status === 'live' && b.status !== 'live') return -1;
     if (b.status === 'live' && a.status !== 'live') return 1;
@@ -785,7 +801,6 @@ function renderLeaderboard() {
     const rankDisplay = isUnselected ? '—' : (i + 1);
     const rankCls = (!isUnselected && i < 3) ? 'rank-' + (i+1) : '';
     
-    // Dim the color presentation properties slightly if rendering the Unselected team collection
     const extraStyle = isUnselected ? 'style="opacity: 0.65; border-left: 3px dashed var(--muted);"' : '';
 
     const div = document.createElement('div');
