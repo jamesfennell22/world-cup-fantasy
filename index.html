@@ -62,8 +62,10 @@
   .team-tag:hover { border-color: var(--accent); transform: translateY(-2px); }
   .team-tag .t-name { font-weight: 500; display: block; margin-bottom: 0.25rem; }
   .team-tag .t-pts  { font-size: 0.75rem; color: var(--muted); }
-  /* NEW: Style class to cross out knocked out teams gracefully */
-  .team-tag.eliminated { text-decoration: line-through; opacity: 0.45; border-color: rgba(232,64,64,0.15); }
+  
+  /* UPDATED: Dim eliminated cards slightly and highlight the card border softly */
+  .team-tag.eliminated { opacity: 0.65; border-color: rgba(232,64,64,0.3); }
+  .elim-x { color: var(--accent2); font-weight: bold; margin-left: 4px; font-size: 0.85rem; }
 
   /* Match cards */
   .match-list { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -327,7 +329,6 @@ const API_KEY           = '01c0a0cdc86a441aa5c96ac0f075b184';
 const WC_COMPETITION_ID = 2000;
 const WORKER_URL        = 'https://gentle-bar-9a1f.jfennell.workers.dev/';
 
-// List of all eligible tournament teams to build "Unselected" tracking list
 const MASTER_TEAMS_LIST = [
   "Argentina","Australia","Austria","Belgium","Bosnia and Herzegovina","Brazil","Canada","Cape Verde",
   "Colombia","Croatia","Czech Republic","DR Congo","Ecuador","Egypt","England","France","Germany",
@@ -339,11 +340,10 @@ const MASTER_TEAMS_LIST = [
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let players       = [];
-// UPDATED: Added structural arrays to track team progression vectors natively
 let gameData      = { matches: [], qualified: [], knockedOut: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
 let scoredPlayers = [];
 let playerCount   = 0;
-let localRedCards = {}; // Structure payload record: { [matchId]: { home: 0, away: 0 } }
+let localRedCards = {};
 
 function norm(t) { 
   if (!t) return '';
@@ -495,7 +495,6 @@ async function fetchAndUpdate() {
         };
       });
 
-      // UPDATED: Bind structural advancement array elements returned directly from Cloudflare memory space
       gameData = { 
         ...gameData, 
         matches: converted, 
@@ -584,7 +583,6 @@ function calculateTeamTotalPoints(teamName) {
   let pts = 0;
   gameData.matches.forEach(m => { pts += getMatchPointsForTeam(teamName, m); });
   
-  // UPDATED: Automatically add +0.5 calculation bonus points for team qualification records found
   if (gameData.qualified && gameData.qualified.some(q => norm(q) === norm(teamName))) {
     pts += 0.5;
   }
@@ -833,13 +831,14 @@ function renderLeaderboard() {
       <div class="roster-breakdown" id="roster_${i}">
         <div class="roster-grid">
           ${p.breakdown.map(b => {
-            // UPDATED: Check if the team name exists in the knockedOut telemetry tracking array
+            // UPDATED: Append a styled red indicator string when an elimination status is true
             const isEliminated = gameData.knockedOut && gameData.knockedOut.some(ko => norm(ko) === norm(b.team));
             const eliminatedClass = isEliminated ? 'eliminated' : '';
+            const statusIndicator = isEliminated ? '<span class="elim-x">❌</span>' : '';
             
             return `
             <div class="team-tag ${eliminatedClass}" onclick="event.stopPropagation(); openTeamModal('${b.team.replace(/'/g,"\\'")}', '${p.name.replace(/'/g,"\\'")}')">
-              <span class="t-name">${b.team||'—'}</span>
+              <span class="t-name">${b.team||'—'}${statusIndicator}</span>
               <span class="t-pts">${fmtPts(b.points)} pts (${b.played} MP)</span>
             </div>`;
           }).join('')}
