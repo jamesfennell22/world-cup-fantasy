@@ -62,6 +62,8 @@
   .team-tag:hover { border-color: var(--accent); transform: translateY(-2px); }
   .team-tag .t-name { font-weight: 500; display: block; margin-bottom: 0.25rem; }
   .team-tag .t-pts  { font-size: 0.75rem; color: var(--muted); }
+  /* NEW: Style class to cross out knocked out teams gracefully */
+  .team-tag.eliminated { text-decoration: line-through; opacity: 0.45; border-color: rgba(232,64,64,0.15); }
 
   /* Match cards */
   .match-list { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -284,7 +286,6 @@
       </div>
     </div>
 
-    <!-- Administrative Logging Tool Panel -->
     <div id="adminTab" class="tab-content">
       <div class="card">
         <div class="card-title">Red Cards Logger</div>
@@ -338,7 +339,8 @@ const MASTER_TEAMS_LIST = [
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let players       = [];
-let gameData      = { matches: [], qualified: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
+// UPDATED: Added structural arrays to track team progression vectors natively
+let gameData      = { matches: [], qualified: [], knockedOut: [], goldenBoot: null, goalOfTournament: null, youngPlayer: null };
 let scoredPlayers = [];
 let playerCount   = 0;
 let localRedCards = {}; // Structure payload record: { [matchId]: { home: 0, away: 0 } }
@@ -347,7 +349,6 @@ function norm(t) {
   if (!t) return '';
   let val = t.trim().toLowerCase();
   
-  // Normalized conflict map adjustments to support cross-provider strings seamlessly
   if (val === 'czechia' || val === 'czechrepublic') return 'czechrepublic';
   if (val === 'cape verde' || val === 'cabo verde' || val === 'capeverde' || val === 'caboverde' || val === 'cape verde islands') return 'capeverde';
   if (val === 'dr congo' || val === 'congo dr' || val === 'drcongo' || val === 'congodr' || val.includes('democratic republic of the congo')) return 'drcongo';
@@ -466,10 +467,8 @@ async function fetchAndUpdate() {
     parsed = await res.json();
   } catch(e) { errMsg = e.message; }
 
-  // FIX: Unpack the new { matches: [], savedRedCards: {} } object blueprint wrapper structure cleanly
   if (parsed && parsed.matches) {
     try {
-      // Retain the structural state map overrides delivered from Cloudflare global storage
       localRedCards = parsed.savedRedCards || {};
 
       const converted = parsed.matches.map(m => {
@@ -496,7 +495,15 @@ async function fetchAndUpdate() {
         };
       });
 
-      gameData = { ...gameData, matches: converted, lastUpdated: new Date().toISOString() };
+      // UPDATED: Bind structural advancement array elements returned directly from Cloudflare memory space
+      gameData = { 
+        ...gameData, 
+        matches: converted, 
+        qualified: parsed.qualifiedTeams || [],
+        knockedOut: parsed.knockedOutTeams || [],
+        lastUpdated: new Date().toISOString() 
+      };
+      
       buildScoredPlayers();
       renderAll();
 
@@ -576,7 +583,12 @@ function getMatchPointsBreakdown(teamName, m) {
 function calculateTeamTotalPoints(teamName) {
   let pts = 0;
   gameData.matches.forEach(m => { pts += getMatchPointsForTeam(teamName, m); });
-  gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) pts += 0.5; });
+  
+  // UPDATED: Automatically add +0.5 calculation bonus points for team qualification records found
+  if (gameData.qualified && gameData.qualified.some(q => norm(q) === norm(teamName))) {
+    pts += 0.5;
+  }
+  
   if (norm(gameData.goldenBoot)       === norm(teamName)) pts += 1;
   if (norm(gameData.goalOfTournament) === norm(teamName)) pts += 1;
   if (norm(gameData.youngPlayer)      === norm(teamName)) pts += 1;
@@ -671,7 +683,9 @@ function openTeamModal(teamName, ownerName) {
     });
 
     const bonuses = [];
-    gameData.qualified.forEach(q => { if (norm(q) === norm(teamName)) bonuses.push({ label: 'Qualified from group', pts: 0.5 }); });
+    if (gameData.qualified && gameData.qualified.some(q => norm(q) === norm(teamName))) {
+      bonuses.push({ label: 'Qualified from group stage', pts: 0.5 });
+    }
     if (norm(gameData.goldenBoot)       === norm(teamName)) bonuses.push({ label: 'Golden Boot', pts: 1 });
     if (norm(gameData.goalOfTournament) === norm(teamName)) bonuses.push({ label: 'Goal of Tournament', pts: 1 });
     if (norm(gameData.youngPlayer)      === norm(teamName)) bonuses.push({ label: 'Young Player of Tournament', pts: 1 });
@@ -706,7 +720,6 @@ function updateCardCounter(matchId, field, delta) {
   
   localRedCards[matchId][field] = Math.max(0, localRedCards[matchId][field] + delta);
 
-  // Instantly apply metrics directly to current local runtime instance matches array
   const tgtMatch = gameData.matches.find(m => m.id === matchId);
   if (tgtMatch) {
     tgtMatch.redCards[field] = localRedCards[matchId][field];
@@ -717,7 +730,6 @@ function updateCardCounter(matchId, field, delta) {
   renderAll();
 }
 
-// NEW: Transmit the entire administrative card payload matrix down to your Cloudflare KV network endpoint
 async function syncRedCardsToCloudflare() {
   setStatus('loading', 'Syncing overrides to Cloudflare...');
   try {
@@ -820,11 +832,17 @@ function renderLeaderboard() {
       </div>
       <div class="roster-breakdown" id="roster_${i}">
         <div class="roster-grid">
-          ${p.breakdown.map(b => `
-            <div class="team-tag" onclick="event.stopPropagation(); openTeamModal('${b.team.replace(/'/g,"\\'")}', '${p.name.replace(/'/g,"\\'")}')">
+          ${p.breakdown.map(b => {
+            // UPDATED: Check if the team name exists in the knockedOut telemetry tracking array
+            const isEliminated = gameData.knockedOut && gameData.knockedOut.some(ko => norm(ko) === norm(b.team));
+            const eliminatedClass = isEliminated ? 'eliminated' : '';
+            
+            return `
+            <div class="team-tag ${eliminatedClass}" onclick="event.stopPropagation(); openTeamModal('${b.team.replace(/'/g,"\\'")}', '${p.name.replace(/'/g,"\\'")}')">
               <span class="t-name">${b.team||'—'}</span>
               <span class="t-pts">${fmtPts(b.points)} pts (${b.played} MP)</span>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
       </div>`;
     c.appendChild(div);
